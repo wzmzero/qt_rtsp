@@ -66,7 +66,7 @@ std::vector<demo::protocol::DetectionObject> loadYoloObjects(const std::string& 
     demo::protocol::DetectionObject o;
     auto it = classMap.find(cls);
     o.label_id = cls;
-    o.label_name = (it == classMap.end()) ? ("cls_" + std::to_string(cls)) : it->second;
+    o.label = (it == classMap.end()) ? ("cls_" + std::to_string(cls)) : it->second;
     o.confidence = conf;
     o.cx = cx;
     o.cy = cy;
@@ -175,7 +175,7 @@ int TcpSimServer::run() {
           const double rodConf = cfg_.rod_conf;
           demo::protocol::DetectionObject person;
           person.label_id = 0;
-          person.label_name = "person";
+          person.label = "person";
           person.confidence = personConf;
           person.cx = personCx;
           person.cy = personCy;
@@ -184,7 +184,7 @@ int TcpSimServer::run() {
 
           demo::protocol::DetectionObject rod;
           rod.label_id = 1;
-          rod.label_name = "rod";
+          rod.label = "rod";
           rod.confidence = rodConf;
           rod.cx = rodCx;
           rod.cy = rodCy;
@@ -206,8 +206,8 @@ int TcpSimServer::run() {
         g.fix_type = 3;
         g.satellites_visible = 11;
 
-        const auto line = demo::protocol::to_json_line(d, g, now_ms);
-        const auto ret = ::send(client_fd, line.data(), line.size(), MSG_NOSIGNAL);
+        const auto frame = demo::protocol::to_protobuf_frame(d, g, now_ms);
+        const auto ret = ::send(client_fd, frame.data(), frame.size(), MSG_NOSIGNAL);
         if (ret <= 0) {
           break;
         }

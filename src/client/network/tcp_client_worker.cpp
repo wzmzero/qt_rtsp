@@ -1,9 +1,7 @@
 #include "network/tcp_client_worker.h"
 
 #include <QDateTime>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
+#include "telemetry.pb.h"
 
 namespace demo::client {
 
@@ -52,65 +50,61 @@ void TcpClientWorker::onDisconnected() {
 
 void TcpClientWorker::onReadyRead() {
   buf_.append(socket_->readAll());
-  while (true) {
-    const int idx = buf_.indexOf('\n');
-    if (idx < 0) break;
-    const auto line = buf_.left(idx);
-    buf_.remove(0, idx + 1);
 
-    QJsonParseError err;
-    const auto doc = QJsonDocument::fromJson(line, &err);
-    if (err.error != QJsonParseError::NoError || !doc.isObject()) {
-      emit logMessage("invalid json line");
+  while (true) {
+    if (buf_.size() < 4) break;
+
+    const quint32 len = (static_cast<quint8>(buf_.at(0)) << 24) |
+                        (static_cast<quint8>(buf_.at(1)) << 16) |
+                        (static_cast<quint8>(buf_.at(2)) << 8) |
+                        static_cast<quint8>(buf_.at(3));
+
+    if (len == 0 || len > 10 * 1024 * 1024) {
+      emit logMessage("invalid protobuf frame length");
+      buf_.clear();
+      break;
+    }
+
+    if (buf_.size() < 4 + static_cast<int>(len)) break;
+
+    const QByteArray payload = buf_.mid(4, static_cast<int>(len));
+    buf_.remove(0, 4 + static_cast<int>(len));
+
+    demo::msg::Telemetry msg;
+    if (!msg.ParseFromArray(payload.constData(), payload.size())) {
+      emit logMessage("invalid protobuf payload");
       continue;
     }
 
-    const auto root = doc.object();
     TelemetryPacket pkt;
     pkt.recvTsMs = QDateTime::currentMSecsSinceEpoch();
-    pkt.sentTsMs = static_cast<qint64>(root.value("sent_ts_ms").toDouble());
-    pkt.rawJsonLine = QString::fromUtf8(line);
+    pkt.sentTsMs = msg.sent_ts_ms();
+    pkt.rawJsonLine = QString::fromUtf8(payload.toHex(' '));
 
-    const auto det = root.value("detection").toObject();
-    pkt.detection.label = det.value("label").toString();
-    pkt.detection.confidence = det.value("confidence").toDouble();
-    pkt.detection.sourceTsMs = static_cast<qint64>(det.value("source_ts_ms").toDouble());
+    pkt.detection.label = QString::fromStdString(msg.detection().label());
+    pkt.detection.confidence = msg.detection().confidence();
+    pkt.detection.sourceTsMs = msg.detection().source_ts_ms();
 
-    auto parseObjects = [&pkt](const QJsonValue& v) {
-      const auto arr = v.toArray();
-      for (const auto& item : arr) {
-        const auto o = item.toObject();
-        demo::client::DetectionObject obj;
-        obj.label = o.value("label").toString();
-        obj.confidence = o.value("confidence").toDouble();
-        if (o.contains("cx") && o.contains("cy") && o.contains("w") && o.contains("h")) {
-          obj.bbox = QRectF(o.value("cx").toDouble(), o.value("cy").toDouble(),
-                            o.value("w").toDouble(), o.value("h").toDouble());
-        } else if (o.contains("bbox") && o.value("bbox").isArray()) {
-          const auto b = o.value("bbox").toArray();
-          if (b.size() >= 4) {
-            obj.bbox = QRectF(b.at(0).toDouble(), b.at(1).toDouble(), b.at(2).toDouble(), b.at(3).toDouble());
-          }
-        }
-        pkt.detection.objects.push_back(obj);
-      }
-    };
+    for (const auto& o : msg.detection().objects()) {
+      demo::client::DetectionObject obj;
+      obj.label = QString::fromStdString(o.label());
+      obj.confidence = o.confidence();
+      obj.bbox = QRectF(o.cx(), o.cy(), o.w(), o.h());
+      pkt.detection.objects.push_back(obj);
+    }
 
-    parseObjects(root.value("objects"));
-    parseObjects(det.value("objects"));
-
-    const auto gps = root.value("gps").toObject();
-    pkt.gps.timeUsec = static_cast<qint64>(gps.value("time_usec").toDouble());
-    pkt.gps.latE7 = gps.value("lat_e7").toInt();
-    pkt.gps.lonE7 = gps.value("lon_e7").toInt();
-    pkt.gps.altMm = gps.value("alt_mm").toInt();
-    pkt.gps.velCms = gps.value("vel_cms").toInt();
-    pkt.gps.cogCdeg = gps.value("cog_cdeg").toInt();
-    pkt.gps.fixType = gps.value("fix_type").toInt();
-    pkt.gps.satellitesVisible = gps.value("satellites_visible").toInt();
+    pkt.gps.timeUsec = msg.gps().time_usec();
+    pkt.gps.latE7 = msg.gps().lat_e7();
+    pkt.gps.lonE7 = msg.gps().lon_e7();
+    pkt.gps.altMm = msg.gps().alt_mm();
+    pkt.gps.velCms = msg.gps().vel_cms();
+    pkt.gps.cogCdeg = msg.gps().cog_cdeg();
+    pkt.gps.fixType = msg.gps().fix_type();
+    pkt.gps.satellitesVisible = msg.gps().satellites_visible();
 
     emit telemetryReceived(pkt);
   }
 }
+
 
 } // namespace demo::client

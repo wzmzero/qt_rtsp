@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package demo.msg;
+
+message DetectionObject {
+  int32 label_id = 1;
+  string label = 2;
+  double confidence = 3;
+  double cx = 4;
+  double cy = 5;
+  double w = 6;
+  double h = 7;
+}
+
+message Detection {
+  string label = 1;
+  double confidence = 2;
+  int64 source_ts_ms = 3;
+  repeated DetectionObject objects = 4;
+}
+
+message Gps {
+  int64 time_usec = 1;
+  int32 lat_e7 = 2;
+  int32 lon_e7 = 3;
+  int32 alt_mm = 4;
+  int32 eph_cm = 5;
+  int32 epv_cm = 6;
+  int32 vel_cms = 7;
+  int32 cog_cdeg = 8;
+  uint32 fix_type = 9;
+  uint32 satellites_visible = 10;
+}
+
+message Telemetry {
+  string type = 1;
+  uint32 version = 2;
+  uint64 seq = 3;
+  int64 sent_ts_ms = 4;
+  Detection detection = 5;
+  Gps gps = 6;
+}
