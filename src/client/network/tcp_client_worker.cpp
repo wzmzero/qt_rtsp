@@ -97,7 +97,7 @@ void TcpClientWorker::onReadyRead() {
 
     for (const auto& o : msg.detections()) {
       demo::client::DetectionObject obj;
-      obj.label = labelFromId(o.label_id());
+      obj.label = o.label().empty() ? labelFromId(o.label_id()) : QString::fromStdString(o.label());
       obj.confidence = o.confidence();
       obj.bbox = QRectF(o.cx(), o.cy(), o.w(), o.h());
       pkt.detection.objects.push_back(obj);
