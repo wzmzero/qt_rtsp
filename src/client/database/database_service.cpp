@@ -23,12 +23,12 @@ int labelIdFromName(const QString& name) {
 
 qint64 persistTelemetryPacket(QSqlDatabase& db, const demo::client::TelemetryPacket& pkt) {
   QSqlQuery t(db);
-  t.prepare("INSERT INTO telemetry_msg(recv_ts_ms,sent_ts_ms,source_ts_ms) VALUES(?,?,?);");
+  t.prepare("INSERT INTO telemetry(recv_ts_ms,sent_ts_ms,source_ts_ms) VALUES(?,?,?);");
   t.addBindValue(pkt.recvTsMs);
   t.addBindValue(pkt.sentTsMs);
   t.addBindValue(pkt.detection.sourceTsMs);
   if (!t.exec()) {
-    qWarning() << "Insert telemetry_msg failed:" << t.lastError().text();
+    qWarning() << "Insert telemetry failed:" << t.lastError().text();
     return -1;
   }
   const qint64 telemetryId = t.lastInsertId().toLongLong();
@@ -53,7 +53,7 @@ qint64 persistTelemetryPacket(QSqlDatabase& db, const demo::client::TelemetryPac
   }
 
   QSqlQuery g(db);
-  g.prepare("INSERT INTO gps_msg(telemetry_id,time_usec,lat_e7,lon_e7,alt_mm,vel_cms,cog_cdeg,fix_type,satellites_visible,lat_deg,lon_deg) "
+  g.prepare("INSERT INTO gps(telemetry_id,time_usec,lat_e7,lon_e7,alt_mm,vel_cms,cog_cdeg,fix_type,satellites_visible,lat_deg,lon_deg) "
             "VALUES(?,?,?,?,?,?,?,?,?,?,?);");
   g.addBindValue(telemetryId);
   g.addBindValue(pkt.gps.timeUsec);
@@ -67,7 +67,7 @@ qint64 persistTelemetryPacket(QSqlDatabase& db, const demo::client::TelemetryPac
   g.addBindValue(static_cast<double>(pkt.gps.latE7) / 10000000.0);
   g.addBindValue(static_cast<double>(pkt.gps.lonE7) / 10000000.0);
   if (!g.exec()) {
-    qWarning() << "Insert gps_msg failed:" << g.lastError().text();
+    qWarning() << "Insert gps failed:" << g.lastError().text();
   }
 
   return telemetryId;
@@ -192,10 +192,10 @@ bool SQLiteDatabaseService::migrate() {
     return false;
   }
 
-  if (!q.exec("CREATE TABLE IF NOT EXISTS telemetry_msg("
+  if (!q.exec("CREATE TABLE IF NOT EXISTS telemetry("
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
               "recv_ts_ms INTEGER NOT NULL, sent_ts_ms INTEGER NOT NULL, source_ts_ms INTEGER NOT NULL);")) {
-    qWarning() << "Create telemetry_msg failed:" << q.lastError().text();
+    qWarning() << "Create telemetry failed:" << q.lastError().text();
     return false;
   }
 
@@ -204,19 +204,19 @@ bool SQLiteDatabaseService::migrate() {
               "telemetry_id INTEGER NOT NULL,"
               "obj_index INTEGER NOT NULL,"
               "label_id INTEGER, label TEXT, confidence REAL, cx REAL, cy REAL, w REAL, h REAL,"
-              "FOREIGN KEY(telemetry_id) REFERENCES telemetry_msg(id));")) {
+              "FOREIGN KEY(telemetry_id) REFERENCES telemetry(id));")) {
     qWarning() << "Create detection_object failed:" << q.lastError().text();
     return false;
   }
 
-  if (!q.exec("CREATE TABLE IF NOT EXISTS gps_msg("
+  if (!q.exec("CREATE TABLE IF NOT EXISTS gps("
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
               "telemetry_id INTEGER NOT NULL UNIQUE,"
               "time_usec INTEGER, lat_e7 INTEGER, lon_e7 INTEGER, alt_mm INTEGER,"
               "vel_cms INTEGER, cog_cdeg INTEGER, fix_type INTEGER, satellites_visible INTEGER,"
               "lat_deg REAL, lon_deg REAL,"
-              "FOREIGN KEY(telemetry_id) REFERENCES telemetry_msg(id));")) {
-    qWarning() << "Create gps_msg failed:" << q.lastError().text();
+              "FOREIGN KEY(telemetry_id) REFERENCES telemetry(id));")) {
+    qWarning() << "Create gps failed:" << q.lastError().text();
     return false;
   }
 
@@ -245,9 +245,9 @@ bool SQLiteDatabaseService::migrate() {
   q.exec("CREATE INDEX IF NOT EXISTS idx_gps_telemetry ON gps_samples(telemetry_id);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_snapshot_filter ON snapshot_events(is_target_event, event_ts_ms, label);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_logs_filter ON app_logs(level, type, ts_ms);");
-  q.exec("CREATE INDEX IF NOT EXISTS idx_tm_recv ON telemetry_msg(recv_ts_ms);");
+  q.exec("CREATE INDEX IF NOT EXISTS idx_telemetry_recv ON telemetry(recv_ts_ms);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_do_tm ON detection_object(telemetry_id, obj_index);");
-  q.exec("CREATE INDEX IF NOT EXISTS idx_gm_tm ON gps_msg(telemetry_id);");
+  q.exec("CREATE INDEX IF NOT EXISTS idx_gps_tm ON gps(telemetry_id);");
 
   if (version < 3) {
     const bool hasLegacy = q.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='telemetry_objects';") && q.next();
@@ -449,7 +449,7 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
                 "IFNULL((SELECT GROUP_CONCAT(printf('%s:[%.2f,%.2f,%.2f,%.2f]', do.label, do.cx, do.cy, do.w, do.h), ' | ') "
                 "        FROM detection_object do WHERE do.telemetry_id = se.telemetry_id ORDER BY do.obj_index LIMIT 2), '') "
                 "FROM snapshot_events se "
-                "LEFT JOIN gps_msg gm ON gm.telemetry_id = se.telemetry_id "
+                "LEFT JOIN gps gm ON gm.telemetry_id = se.telemetry_id "
                 "WHERE se.is_target_event = 1 AND se.event_ts_ms BETWEEN ? AND ?";
   if (!label.trimmed().isEmpty()) {
     sql += " AND se.label = ?";
