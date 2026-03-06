@@ -4,7 +4,7 @@ package demo.msg;
 
 message DetectionObject {
   int32 label_id = 1;      // 类别ID（建议 0=person, 1=rod；可映射）
-  string label = 2;        // 类别名称（如 "person" / "rod"）
+  reserved 2;              // 预留原 label 字段编号（兼容历史）
   double confidence = 3;   // 目标置信度 [0,1]
   double cx = 4;           // 目标框中心点 x（归一化）
   double cy = 5;           // 目标框中心点 y（归一化）

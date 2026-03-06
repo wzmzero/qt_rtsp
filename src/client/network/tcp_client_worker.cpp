@@ -5,6 +5,16 @@
 
 namespace demo::client {
 
+namespace {
+QString labelFromId(int id) {
+  switch (id) {
+    case 0: return "person";
+    case 1: return "rod";
+    default: return QString("cls_%1").arg(id);
+  }
+}
+} // namespace
+
 TcpClientWorker::TcpClientWorker(QObject* parent) : QObject(parent) {
   socket_ = new QTcpSocket(this);
   reconnectTimer_.setSingleShot(true);
@@ -87,7 +97,7 @@ void TcpClientWorker::onReadyRead() {
 
     for (const auto& o : msg.detections()) {
       demo::client::DetectionObject obj;
-      obj.label = QString::fromStdString(o.label());
+      obj.label = labelFromId(o.label_id());
       obj.confidence = o.confidence();
       obj.bbox = QRectF(o.cx(), o.cy(), o.w(), o.h());
       pkt.detection.objects.push_back(obj);

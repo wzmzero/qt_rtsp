@@ -46,7 +46,6 @@ inline std::string to_protobuf_payload(const Detection& d, const Gps& g, std::in
   for (const auto& o : d.objects) {
     auto* out = msg.add_detections();
     out->set_label_id(o.label_id);
-    out->set_label(o.label);
     out->set_confidence(o.confidence);
     out->set_cx(o.cx);
     out->set_cy(o.cy);

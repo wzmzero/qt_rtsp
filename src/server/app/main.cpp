@@ -80,7 +80,7 @@ void print_usage(const char* prog) {
             << "  " << prog << " --tcp-port 9000 --video media/test.mp4\n"
             << "  " << prog << " --tcp-port 9000 --health-interval-sec 0\n"
             << "  " << prog << " --fixed-msg --person-conf 0.95 --rod-conf 0.85 --person-cx 0.40 --rod-cx 0.43\n"
-            << "  " << prog << " --yolo-txt labels/0004.txt --class-map labels/classes.yaml\n"
+            << "  " << prog << " --yolo-txt labels/example_labels.txt --class-map labels/class_map.txt\n"
             << "  " << prog << " 9000 media/test.mp4\n";
 }
 
