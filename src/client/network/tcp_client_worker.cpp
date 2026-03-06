@@ -1,6 +1,7 @@
 #include "network/tcp_client_worker.h"
 
 #include <QDateTime>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 
@@ -73,6 +74,26 @@ void TcpClientWorker::onReadyRead() {
     pkt.detection.label = det.value("label").toString();
     pkt.detection.confidence = det.value("confidence").toDouble();
     pkt.detection.sourceTsMs = static_cast<qint64>(det.value("source_ts_ms").toDouble());
+
+    auto parseObjects = [&pkt](const QJsonValue& v) {
+      const auto arr = v.toArray();
+      for (const auto& item : arr) {
+        const auto o = item.toObject();
+        demo::client::DetectionObject obj;
+        obj.label = o.value("label").toString();
+        obj.confidence = o.value("confidence").toDouble();
+        if (o.contains("bbox") && o.value("bbox").isArray()) {
+          const auto b = o.value("bbox").toArray();
+          if (b.size() >= 4) {
+            obj.bbox = QRectF(b.at(0).toDouble(), b.at(1).toDouble(), b.at(2).toDouble(), b.at(3).toDouble());
+          }
+        }
+        pkt.detection.objects.push_back(obj);
+      }
+    };
+
+    parseObjects(root.value("objects"));
+    parseObjects(det.value("objects"));
 
     const auto gps = root.value("gps").toObject();
     pkt.gps.timeUsec = static_cast<qint64>(gps.value("time_usec").toDouble());

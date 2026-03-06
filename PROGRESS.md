@@ -60,3 +60,35 @@
 1. 回放页仍为功能占位，尚未实现播放器列表/时间轴 UI。
 2. `insertSnapshotEventAsync` 当前会额外插入一条 telemetry+gps（用于保证事件关联），后续可引入去重策略。
 3. 事件目标规则目前仍是 `label == person`（可配置化待后续迭代）。
+
+
+## 2026-03-06（Release 收尾：相对路径 + 组合告警）
+
+### 新增与调整
+1. **持久化路径统一相对策略**（运行目录优先）
+   - SQLite: `./data/client_data.sqlite`
+   - 文本日志: `./logs/qt_client.log`
+   - 截图: `./snapshots/`
+   - 录制元数据: `./recordings/record_meta.jsonl`
+   - 回放索引 `meta_path` 优先记录相对路径
+
+2. **配置覆盖保留**
+   - 支持绝对路径覆盖；默认配置模板与保存值优先相对路径（`./data ./logs ./snapshots ./recordings`）。
+   - 客户端配置文件迁移到相对目录：`./conf/client.ini`。
+
+3. **person+rod 组合告警最小可用实现**
+   - TCP 检测消息支持对象列表：`label/confidence/bbox`。
+   - IoU 判断（阈值默认 0.10），触发后更新 UI 告警灯/状态文本，并写日志。
+   - 检测对象 JSON 入库：`telemetry_results.detection_objects_json`。
+
+4. **Release 构建验证**
+   - `cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release` ✅
+   - `cmake --build build-release -j4` ✅
+
+5. **发布目录产出**
+   - `release/bin/qt_client`
+   - `release/bin/sim_server`
+   - `release/conf/client.ini(.template)`
+   - `release/scripts/run_server.sh`, `run_client.sh`
+   - `release/media/test.mp4` + README
+   - `release/README_RELEASE.md`

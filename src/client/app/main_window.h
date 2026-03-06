@@ -4,6 +4,7 @@
 #include "core/types.h"
 
 #include <QMainWindow>
+#include <QRectF>
 #include <QThread>
 #include <QVideoFrame>
 
@@ -59,6 +60,11 @@ private:
   void appendLog(const QString& level, const QString& type, const QString& msg);
   void refreshLogView();
   QString saveScreenshotWithMetadata(const QString& reasonTag);
+  QString resolvePath(const QString& configuredPath, const QString& defaultRelative) const;
+  QString toStoredRelativePath(const QString& path) const;
+  void ensureRuntimeDirs();
+  void evaluatePersonRodAlert(const demo::client::TelemetryPacket& pkt);
+  double bboxIoU(const QRectF& a, const QRectF& b) const;
 
   struct LogEntry {
     qint64 tsMs{0};
@@ -71,10 +77,12 @@ private:
 
   QLabel* connState_{nullptr};
   QLabel* connLight_{nullptr};
+  QLabel* alertLight_{nullptr};
   QLabel* tsLabel_{nullptr};
   QLabel* detectionLabel_{nullptr};
   QLabel* gpsRawLabel_{nullptr};
   QLabel* gpsParsedLabel_{nullptr};
+  QLabel* alertStateLabel_{nullptr};
 
   QLineEdit* rtspEdit_{nullptr};
   QLineEdit* tcpHostEdit_{nullptr};
@@ -115,6 +123,12 @@ private:
 
   demo::client::TelemetryPacket lastPkt_{};
   demo::client::AppConfig config_{};
+  QString projectRootDir_;
   QString dataDir_;
+  QString logsDir_;
+  QString snapshotsDir_;
   QString dbPath_;
+  QString logFilePath_;
+  bool alertActive_{false};
+  double alertIouThreshold_{0.10};
 };

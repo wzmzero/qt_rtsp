@@ -12,7 +12,7 @@ struct AppConfig {
   QString tcpHost{"127.0.0.1"};
   quint16 tcpPort{9000};
   int reconnectIntervalMs{3000};
-  QString recordDir;
+  QString recordDir{"./recordings"};
   bool recordEnabled{true};
   QString theme{"dark"};
   QByteArray windowGeometry;

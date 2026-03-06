@@ -13,12 +13,16 @@
 #include <QDateTime>
 #include <QDateTimeEdit>
 #include <QDir>
+#include <QFile>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QIcon>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenuBar>
@@ -28,12 +32,12 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
-#include <QStandardPaths>
 #include <QStackedWidget>
 #include <QStatusBar>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTimer>
+#include <QTextStream>
 #include <QToolButton>
 #include <QUrl>
 #include <QVideoSink>
@@ -45,9 +49,16 @@ double e7ToDegree(int e7) { return static_cast<double>(e7) / 10000000.0; }
 }
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-  settings_ = new QSettings("qt_rtsp_tcp_project", "qt_client", this);
-  dataDir_ = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-  dbPath_ = dataDir_ + "/client_data.sqlite";
+  projectRootDir_ = QDir::currentPath();
+  const QString confDir = QDir(projectRootDir_).filePath("./conf");
+  QDir().mkpath(confDir);
+  settings_ = new QSettings(QDir(confDir).filePath("client.ini"), QSettings::IniFormat, this);
+  dataDir_ = resolvePath(settings_->value("storage/data_dir").toString(), "./data");
+  logsDir_ = resolvePath(settings_->value("storage/logs_dir").toString(), "./logs");
+  snapshotsDir_ = resolvePath(settings_->value("storage/snapshots_dir").toString(), "./snapshots");
+  dbPath_ = QDir(dataDir_).filePath("client_data.sqlite");
+  logFilePath_ = QDir(logsDir_).filePath("qt_client.log");
+  ensureRuntimeDirs();
 
   db_ = new demo::client::SQLiteDatabaseService(dbPath_);
   repo_ = new demo::client::AppRepository(db_, settings_, this);
@@ -91,13 +102,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   }
 
   config_ = repo_->loadConfig();
-  if (config_.recordDir.isEmpty()) config_.recordDir = dataDir_ + "/records";
+  if (config_.recordDir.isEmpty()) config_.recordDir = "./recordings";
+  config_.recordDir = resolvePath(config_.recordDir, "./recordings");
   applyConfigToUi(config_);
 
   if (!config_.windowGeometry.isEmpty()) restoreGeometry(config_.windowGeometry);
   if (!config_.windowState.isEmpty()) restoreState(config_.windowState);
 
-  statusBar()->showMessage(QString("数据库: %1").arg(dbPath_));
+  statusBar()->showMessage(QString("工程目录: %1 | 数据库: %2").arg(projectRootDir_, dbPath_));
   appendLog("INFO", "app", "MainWindow initialized");
 }
 
@@ -189,6 +201,16 @@ void MainWindow::setupUi() {
   lightRow->addStretch();
   statusLayout->addLayout(lightRow);
   statusLayout->addWidget(connState_);
+  auto* alertRow = new QHBoxLayout();
+  alertRow->addWidget(new QLabel("告警灯:", statusBox));
+  alertLight_ = new QLabel(statusBox);
+  alertLight_->setFixedSize(14, 14);
+  alertLight_->setStyleSheet("background:#334155;border-radius:7px;");
+  alertRow->addWidget(alertLight_);
+  alertRow->addStretch();
+  statusLayout->addLayout(alertRow);
+  alertStateLabel_ = new QLabel("组合告警: idle", statusBox);
+  statusLayout->addWidget(alertStateLabel_);
 
   auto* rawGroup = new QGroupBox("未解析原始数据", statusBox);
   auto* rawLayout = new QVBoxLayout(rawGroup);
@@ -329,12 +351,17 @@ void MainWindow::setupUi() {
 
 void MainWindow::onStartAll() {
   config_ = collectConfigFromUi();
+  settings_->setValue("storage/data_dir", toStoredRelativePath(dataDir_));
+  settings_->setValue("storage/logs_dir", toStoredRelativePath(logsDir_));
+  settings_->setValue("storage/snapshots_dir", toStoredRelativePath(snapshotsDir_));
+  settings_->sync();
   repo_->saveConfig(config_);
 
+  const QString runtimeRecordDir = resolvePath(config_.recordDir, "./recordings");
   QMetaObject::invokeMethod(tcp_, "start", Qt::QueuedConnection, Q_ARG(QString, config_.tcpHost),
                             Q_ARG(quint16, config_.tcpPort), Q_ARG(int, config_.reconnectIntervalMs));
   QMetaObject::invokeMethod(stream_, "start", Qt::QueuedConnection, Q_ARG(QUrl, QUrl(config_.rtspUrl)));
-  if (config_.recordEnabled) QMetaObject::invokeMethod(recorder_, "start", Qt::QueuedConnection, Q_ARG(QString, config_.recordDir));
+  if (config_.recordEnabled) QMetaObject::invokeMethod(recorder_, "start", Qt::QueuedConnection, Q_ARG(QString, runtimeRecordDir));
 
   statusBar()->showMessage(QString("运行中 | DB: %1").arg(dbPath_));
   appendLog("INFO", "app", "Workers started");
@@ -352,6 +379,10 @@ void MainWindow::onSaveConfig() {
   config_ = collectConfigFromUi();
   config_.windowGeometry = saveGeometry();
   config_.windowState = saveState();
+  settings_->setValue("storage/data_dir", toStoredRelativePath(dataDir_));
+  settings_->setValue("storage/logs_dir", toStoredRelativePath(logsDir_));
+  settings_->setValue("storage/snapshots_dir", toStoredRelativePath(snapshotsDir_));
+  settings_->sync();
   repo_->saveConfig(config_);
   applyTheme(config_.theme);
   appendLog("INFO", "app", "Config saved to QSettings + SQLite");
@@ -361,7 +392,10 @@ void MainWindow::onSaveConfig() {
 void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
   lastPkt_ = pkt;
   tsLabel_->setText(QString("时间戳: source=%1 sent=%2 recv=%3").arg(pkt.detection.sourceTsMs).arg(pkt.sentTsMs).arg(pkt.recvTsMs));
-  detectionLabel_->setText(QString("检测结果: %1 (%.2f)").arg(pkt.detection.label).arg(pkt.detection.confidence, 0, 'f', 2));
+  detectionLabel_->setText(QString("检测结果: %1 (%.2f), objects=%3")
+                               .arg(pkt.detection.label)
+                               .arg(pkt.detection.confidence, 0, 'f', 2)
+                               .arg(pkt.detection.objects.size()));
   gpsRawLabel_->setText(QString("GPS(E7): lat=%1 lon=%2 alt_mm=%3 sat=%4")
                             .arg(pkt.gps.latE7)
                             .arg(pkt.gps.lonE7)
@@ -371,6 +405,7 @@ void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
                                .arg(e7ToDegree(pkt.gps.latE7), 0, 'f', 7)
                                .arg(e7ToDegree(pkt.gps.lonE7), 0, 'f', 7));
 
+  evaluatePersonRodAlert(pkt);
   repo_->appendTelemetry(pkt);
 }
 
@@ -405,7 +440,7 @@ void MainWindow::blinkConnectionIndicator() {
 }
 
 QString MainWindow::saveScreenshotWithMetadata(const QString& reasonTag) {
-  const QString dir = QDir(config_.recordDir).filePath("screenshots");
+  const QString dir = snapshotsDir_;
   QDir().mkpath(dir);
   const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
   const QString path = QDir(dir).filePath(QString("shot_%1_%2.jpg").arg(nowMs).arg(reasonTag));
@@ -416,7 +451,7 @@ QString MainWindow::saveScreenshotWithMetadata(const QString& reasonTag) {
     return {};
   }
 
-  const bool isEvent = (lastPkt_.detection.label.compare("person", Qt::CaseInsensitive) == 0);
+  const bool isEvent = alertActive_;
   QMetaObject::invokeMethod(db_, "insertSnapshotEventAsync", Qt::QueuedConnection,
                             Q_ARG(demo::client::TelemetryPacket, lastPkt_), Q_ARG(QString, path),
                             Q_ARG(QString, reasonTag), Q_ARG(bool, isEvent));
@@ -458,7 +493,7 @@ demo::client::AppConfig MainWindow::collectConfigFromUi() const {
   cfg.tcpHost = tcpHostEdit_->text().trimmed();
   cfg.tcpPort = static_cast<quint16>(tcpPortSpin_->value());
   cfg.reconnectIntervalMs = reconnectSpin_->value();
-  cfg.recordDir = recordDirEdit_->text().trimmed();
+  cfg.recordDir = toStoredRelativePath(resolvePath(recordDirEdit_->text().trimmed(), "./recordings"));
   cfg.recordEnabled = recordEnabledCheck_->isChecked();
   cfg.theme = themeCombo_->currentText();
   return cfg;
@@ -469,7 +504,7 @@ void MainWindow::applyConfigToUi(const demo::client::AppConfig& cfg) {
   tcpHostEdit_->setText(cfg.tcpHost);
   tcpPortSpin_->setValue(cfg.tcpPort);
   reconnectSpin_->setValue(cfg.reconnectIntervalMs);
-  recordDirEdit_->setText(cfg.recordDir);
+  recordDirEdit_->setText(toStoredRelativePath(resolvePath(cfg.recordDir, "./recordings")));
   recordEnabledCheck_->setChecked(cfg.recordEnabled);
   themeCombo_->setCurrentText(cfg.theme);
   applyTheme(cfg.theme);
@@ -496,7 +531,90 @@ void MainWindow::appendLog(const QString& level, const QString& type, const QStr
                               Q_ARG(QString, e.level), Q_ARG(QString, e.type), Q_ARG(QString, e.message));
   }
 
+  QFile lf(logFilePath_);
+  if (lf.open(QIODevice::Append | QIODevice::Text)) {
+    QTextStream out(&lf);
+    out << QDateTime::fromMSecsSinceEpoch(e.tsMs).toString("yyyy-MM-dd HH:mm:ss.zzz") << " [" << e.level
+        << "] [" << e.type << "] " << e.message << "\n";
+  }
+
   refreshLogView();
+}
+
+
+QString MainWindow::resolvePath(const QString& configuredPath, const QString& defaultRelative) const {
+  const QString raw = configuredPath.trimmed().isEmpty() ? defaultRelative : configuredPath.trimmed();
+  const QFileInfo fi(raw);
+  if (fi.isAbsolute()) return QDir::cleanPath(raw);
+  return QDir(projectRootDir_).filePath(raw);
+}
+
+QString MainWindow::toStoredRelativePath(const QString& path) const {
+  const QString rel = QDir(projectRootDir_).relativeFilePath(path);
+  if (!rel.startsWith("..")) return rel.startsWith("./") ? rel : QString("./%1").arg(rel);
+  return path;
+}
+
+void MainWindow::ensureRuntimeDirs() {
+  QDir().mkpath(dataDir_);
+  QDir().mkpath(logsDir_);
+  QDir().mkpath(snapshotsDir_);
+}
+
+double MainWindow::bboxIoU(const QRectF& a, const QRectF& b) const {
+  const QRectF inter = a.intersected(b);
+  if (inter.isEmpty()) return 0.0;
+  const double interArea = inter.width() * inter.height();
+  const double unionArea = a.width() * a.height() + b.width() * b.height() - interArea;
+  return unionArea > 0.0 ? interArea / unionArea : 0.0;
+}
+
+void MainWindow::evaluatePersonRodAlert(const demo::client::TelemetryPacket& pkt) {
+  QVector<demo::client::DetectionObject> persons;
+  QVector<demo::client::DetectionObject> rods;
+  for (const auto& obj : pkt.detection.objects) {
+    const auto lb = obj.label.trimmed().toLower();
+    if (lb == "person") persons.push_back(obj);
+    if (lb == "rod") rods.push_back(obj);
+  }
+
+  bool hit = false;
+  double maxIou = 0.0;
+  for (const auto& p : persons) {
+    for (const auto& r : rods) {
+      const double iou = bboxIoU(p.bbox, r.bbox);
+      if (iou > maxIou) maxIou = iou;
+      if (iou >= alertIouThreshold_) {
+        hit = true;
+      }
+    }
+  }
+
+  alertActive_ = hit;
+  if (alertLight_) {
+    alertLight_->setStyleSheet(hit ? "background:#f59e0b;border-radius:7px;" : "background:#334155;border-radius:7px;");
+  }
+  if (alertStateLabel_) {
+    alertStateLabel_->setText(hit ? QString("组合告警: ACTIVE (IoU=%1)").arg(maxIou, 0, 'f', 2)
+                                  : QString("组合告警: idle (maxIoU=%1)").arg(maxIou, 0, 'f', 2));
+  }
+
+  static qint64 lastAlertLogMs = 0;
+  const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+  if (hit && nowMs - lastAlertLogMs > 1500) {
+    lastAlertLogMs = nowMs;
+    QJsonArray arr;
+    for (const auto& obj : pkt.detection.objects) {
+      QJsonObject jo;
+      jo["label"] = obj.label;
+      jo["confidence"] = obj.confidence;
+      jo["bbox"] = QJsonArray{obj.bbox.x(), obj.bbox.y(), obj.bbox.width(), obj.bbox.height()};
+      arr.push_back(jo);
+    }
+    appendLog("WARN", "event", QString("person+rod告警触发, IoU=%1, objects=%2")
+                                  .arg(maxIou, 0, 'f', 2)
+                                  .arg(QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact))));
+  }
 }
 
 void MainWindow::refreshLogView() {

@@ -3,13 +3,24 @@
 #include <cstdint>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace demo::protocol {
+
+struct DetectionObject {
+  std::string label;
+  double confidence{0.0};
+  double x{0.0};
+  double y{0.0};
+  double w{0.0};
+  double h{0.0};
+};
 
 struct Detection {
   std::string label;
   double confidence{0.0};
   std::int64_t source_ts_ms{0};
+  std::vector<DetectionObject> objects;
 };
 
 struct Gps {
@@ -31,10 +42,17 @@ inline std::string to_json_line(const Detection& d, const Gps& g, std::int64_t s
       << "\"type\":\"telemetry\"," 
       << "\"sent_ts_ms\":" << sent_ts_ms << ","
       << "\"detection\":{"
-      << "\"label\":\"" << d.label << "\","
+      << "\"label\":\"" << d.label << "\"," 
       << "\"confidence\":" << d.confidence << ","
-      << "\"source_ts_ms\":" << d.source_ts_ms
-      << "},"
+      << "\"source_ts_ms\":" << d.source_ts_ms << ","
+      << "\"objects\":[";
+  for (size_t i = 0; i < d.objects.size(); ++i) {
+    const auto& o = d.objects[i];
+    if (i) oss << ",";
+    oss << "{" << "\"label\":\"" << o.label << "\"," << "\"confidence\":" << o.confidence << ","
+        << "\"bbox\":[" << o.x << "," << o.y << "," << o.w << "," << o.h << "]" << "}";
+  }
+  oss << "]},"
       << "\"gps\":{"
       << "\"time_usec\":" << g.time_usec << ","
       << "\"lat_e7\":" << g.lat_e7 << ","
@@ -45,8 +63,7 @@ inline std::string to_json_line(const Detection& d, const Gps& g, std::int64_t s
       << "\"vel_cms\":" << g.vel_cms << ","
       << "\"cog_cdeg\":" << g.cog_cdeg << ","
       << "\"fix_type\":" << static_cast<int>(g.fix_type) << ","
-      << "\"satellites_visible\":" << static_cast<int>(g.satellites_visible)
-      << "}"
+      << "\"satellites_visible\":" << static_cast<int>(g.satellites_visible) << "}"
       << "}";
   oss << "\n";
   return oss.str();

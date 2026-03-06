@@ -1,14 +1,23 @@
 #pragma once
 
 #include <QMetaType>
+#include <QRectF>
 #include <QString>
+#include <QVector>
 
 namespace demo::client {
+
+struct DetectionObject {
+  QString label;
+  double confidence{0.0};
+  QRectF bbox;
+};
 
 struct DetectionMsg {
   QString label;
   double confidence{0.0};
   qint64 sourceTsMs{0};
+  QVector<DetectionObject> objects;
 };
 
 struct GpsMsg {

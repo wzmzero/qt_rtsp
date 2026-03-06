@@ -75,3 +75,31 @@ mediamtx
 ## 验证记录（本次）
 - 编译验证：`cmake -S . -B build && cmake --build build -j4` ✅
 - 运行冒烟：`QT_QPA_PLATFORM=offscreen ./build/src/client/qt_client`（`timeout 5s` 控制退出）✅
+
+
+## 路径策略（发布版）
+
+当前采用“**相对当前工程/运行目录优先**”策略，默认写入：
+- `./data/client_data.sqlite`（SQLite）
+- `./logs/qt_client.log`（文本日志）
+- `./snapshots/`（截图）
+- `./recordings/record_meta.jsonl`（录制元数据）
+- `playback_index.meta_path` 也优先保存相对路径
+
+配置覆盖仍可用（支持绝对路径），但默认模板与保存值优先使用相对路径，避免绑定宿主机目录。
+
+## person + rod 组合告警（基础框架）
+
+- 支持从检测对象列表读取 `label/confidence/bbox`。
+- 对 person 与 rod 框计算 IoU，默认阈值 `0.10`。
+- 命中后更新 UI 告警状态灯/状态文字，并写入日志（DB + `./logs/qt_client.log`）。
+- 检测对象列表同时以 JSON 字符串写入 SQLite（`telemetry_results.detection_objects_json`）。
+
+## Release 构建与交付
+
+```bash
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release -j4
+```
+
+产物目录：`release/`（含 `bin/ conf/ scripts/ media/ README_RELEASE.md`）。

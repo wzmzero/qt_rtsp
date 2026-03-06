@@ -2,6 +2,9 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QFileInfo>
 #include <QtSql/QSqlError>
 #include <QtSql/QSqlQuery>
@@ -45,6 +48,7 @@ bool SQLiteDatabaseService::ensureConnection() {
   }
   return true;
 }
+
 
 bool SQLiteDatabaseService::initialize() {
   if (!ensureConnection()) return false;
@@ -96,7 +100,7 @@ bool SQLiteDatabaseService::migrate() {
   if (!q.exec("CREATE TABLE IF NOT EXISTS telemetry_results("
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
               "recv_ts_ms INTEGER NOT NULL, sent_ts_ms INTEGER NOT NULL, source_ts_ms INTEGER NOT NULL,"
-              "label TEXT, confidence REAL);")) {
+              "label TEXT, confidence REAL, detection_objects_json TEXT);")) {
     qWarning() << "Create telemetry_results failed:" << q.lastError().text();
     return false;
   }
@@ -182,6 +186,29 @@ bool SQLiteDatabaseService::migrate() {
     }
   }
 
+  // ensure v4 columns exist
+  bool hasDetObjCol = false;
+  if (q.exec("PRAGMA table_info(telemetry_results);") ) {
+    while (q.next()) {
+      if (q.value(1).toString() == "detection_objects_json") {
+        hasDetObjCol = true;
+        break;
+      }
+    }
+  }
+  if (!hasDetObjCol) {
+    q.exec("ALTER TABLE telemetry_results ADD COLUMN detection_objects_json TEXT;");
+  }
+
+  if (version < 4) {
+    q.exec("DELETE FROM schema_version;");
+    if (!q.exec(QString("INSERT INTO schema_version(version,applied_at_ms) VALUES(4,%1);")
+                    .arg(QDateTime::currentMSecsSinceEpoch()))) {
+      qWarning() << "Update schema_version to v4 failed:" << q.lastError().text();
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -233,12 +260,21 @@ void SQLiteDatabaseService::insertTelemetryAsync(const demo::client::TelemetryPa
   if (!ensureConnection()) return;
 
   QSqlQuery telemetryQ(db_);
-  telemetryQ.prepare("INSERT INTO telemetry_results(recv_ts_ms,sent_ts_ms,source_ts_ms,label,confidence) VALUES(?,?,?,?,?);");
+  telemetryQ.prepare("INSERT INTO telemetry_results(recv_ts_ms,sent_ts_ms,source_ts_ms,label,confidence,detection_objects_json) VALUES(?,?,?,?,?,?);");
   telemetryQ.addBindValue(pkt.recvTsMs);
   telemetryQ.addBindValue(pkt.sentTsMs);
   telemetryQ.addBindValue(pkt.detection.sourceTsMs);
   telemetryQ.addBindValue(pkt.detection.label);
   telemetryQ.addBindValue(pkt.detection.confidence);
+  QJsonArray objects;
+  for (const auto& obj : pkt.detection.objects) {
+    QJsonObject jo;
+    jo["label"] = obj.label;
+    jo["confidence"] = obj.confidence;
+    jo["bbox"] = QJsonArray{obj.bbox.x(), obj.bbox.y(), obj.bbox.width(), obj.bbox.height()};
+    objects.push_back(jo);
+  }
+  telemetryQ.addBindValue(QString::fromUtf8(QJsonDocument(objects).toJson(QJsonDocument::Compact)));
   if (!telemetryQ.exec()) {
     qWarning() << "Insert telemetry_results failed:" << telemetryQ.lastError().text();
     return;
@@ -274,12 +310,21 @@ void SQLiteDatabaseService::insertSnapshotEventAsync(const demo::client::Telemet
   if (screenshotPath.trimmed().isEmpty()) return;
 
   QSqlQuery telemetryQ(db_);
-  telemetryQ.prepare("INSERT INTO telemetry_results(recv_ts_ms,sent_ts_ms,source_ts_ms,label,confidence) VALUES(?,?,?,?,?);");
+  telemetryQ.prepare("INSERT INTO telemetry_results(recv_ts_ms,sent_ts_ms,source_ts_ms,label,confidence,detection_objects_json) VALUES(?,?,?,?,?,?);");
   telemetryQ.addBindValue(pkt.recvTsMs);
   telemetryQ.addBindValue(pkt.sentTsMs);
   telemetryQ.addBindValue(pkt.detection.sourceTsMs);
   telemetryQ.addBindValue(pkt.detection.label);
   telemetryQ.addBindValue(pkt.detection.confidence);
+  QJsonArray objects;
+  for (const auto& obj : pkt.detection.objects) {
+    QJsonObject jo;
+    jo["label"] = obj.label;
+    jo["confidence"] = obj.confidence;
+    jo["bbox"] = QJsonArray{obj.bbox.x(), obj.bbox.y(), obj.bbox.width(), obj.bbox.height()};
+    objects.push_back(jo);
+  }
+  telemetryQ.addBindValue(QString::fromUtf8(QJsonDocument(objects).toJson(QJsonDocument::Compact)));
   if (!telemetryQ.exec()) {
     qWarning() << "Insert telemetry for snapshot failed:" << telemetryQ.lastError().text();
     return;

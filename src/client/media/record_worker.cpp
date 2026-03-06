@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTextStream>
@@ -40,6 +41,15 @@ void RecordWorker::enqueue(const RecordItem& item) {
   det["label"] = item.telemetry.detection.label;
   det["confidence"] = item.telemetry.detection.confidence;
   det["source_ts_ms"] = item.telemetry.detection.sourceTsMs;
+  QJsonArray objs;
+  for (const auto& obj : item.telemetry.detection.objects) {
+    QJsonObject jo;
+    jo["label"] = obj.label;
+    jo["confidence"] = obj.confidence;
+    jo["bbox"] = QJsonArray{obj.bbox.x(), obj.bbox.y(), obj.bbox.width(), obj.bbox.height()};
+    objs.push_back(jo);
+  }
+  det["objects"] = objs;
   root["detection"] = det;
 
   QJsonObject gps;
@@ -64,7 +74,9 @@ void RecordWorker::enqueue(const RecordItem& item) {
   demo::client::PlaybackIndexRecord rec;
   rec.frameTsMs = item.frameTsMs;
   rec.wallTsMs = root["wall_ts_ms"].toInteger();
-  rec.metaPath = outDir_ + "/record_meta.jsonl";
+  const QString metaAbs = outDir_ + "/record_meta.jsonl";
+  const QString metaRel = QDir::current().relativeFilePath(metaAbs);
+  rec.metaPath = metaRel.startsWith("..") ? metaAbs : QString("./%1").arg(metaRel);
   rec.latencyMs = root["latency_ms"].toInteger();
   rec.label = item.telemetry.detection.label;
   rec.confidence = item.telemetry.detection.confidence;
