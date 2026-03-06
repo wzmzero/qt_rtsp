@@ -65,10 +65,11 @@ std::vector<demo::protocol::DetectionObject> loadYoloObjects(const std::string& 
 
     demo::protocol::DetectionObject o;
     auto it = classMap.find(cls);
-    o.label = (it == classMap.end()) ? ("cls_" + std::to_string(cls)) : it->second;
+    o.label_id = cls;
+    o.label_name = (it == classMap.end()) ? ("cls_" + std::to_string(cls)) : it->second;
     o.confidence = conf;
-    o.x = cx;
-    o.y = cy;
+    o.cx = cx;
+    o.cy = cy;
     o.w = w;
     o.h = h;
     out.push_back(o);
@@ -172,8 +173,24 @@ int TcpSimServer::run() {
 
           const double personConf = cfg_.person_conf;
           const double rodConf = cfg_.rod_conf;
-          demo::protocol::DetectionObject person{"person", personConf, personCx, personCy, personW, personH};
-          demo::protocol::DetectionObject rod{"rod", rodConf, rodCx, rodCy, cfg_.rod_w, cfg_.rod_h};
+          demo::protocol::DetectionObject person;
+          person.label_id = 0;
+          person.label_name = "person";
+          person.confidence = personConf;
+          person.cx = personCx;
+          person.cy = personCy;
+          person.w = personW;
+          person.h = personH;
+
+          demo::protocol::DetectionObject rod;
+          rod.label_id = 1;
+          rod.label_name = "rod";
+          rod.confidence = rodConf;
+          rod.cx = rodCx;
+          rod.cy = rodCy;
+          rod.w = cfg_.rod_w;
+          rod.h = cfg_.rod_h;
+
           d.objects.push_back(person);
           d.objects.push_back(rod);
         }
