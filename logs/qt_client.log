@@ -120,3 +120,4 @@
 2026-03-06 17:21:34.967 [INFO] [event] 事件查询完成: 0 条
 2026-03-06 17:24:54.036 [INFO] [app] Workers stopped
 2026-03-06 17:25:23.384 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 17:29:17.423 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db

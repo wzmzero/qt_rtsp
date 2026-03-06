@@ -273,14 +273,35 @@ void MainWindow::setupUi() {
 
   auto* connGroup = new QGroupBox("连接状态", rightCol);
   auto* connLayout = new QVBoxLayout(connGroup);
-  connLayout->addWidget(makeStateRow("RTSP 是否连接", &rtspLight_, &rtspStateLabel_, connGroup));
-  connLayout->addWidget(makeStateRow("TCP 是否连接", &tcpLight_, &tcpStateLabel_, connGroup));
-  connLayout->addWidget(makeStateRow("是否响应绑定", &bindLight_, &bindStateLabel_, connGroup));
+  auto* connRow = new QWidget(connGroup);
+  auto* connRowLayout = new QHBoxLayout(connRow);
+  connRowLayout->setContentsMargins(0, 0, 0, 0);
+  connRowLayout->setSpacing(12);
+
+  rtspLight_ = new QLabel(connRow);
+  rtspLight_->setFixedSize(12, 12);
+  rtspStateLabel_ = new QLabel("RTSP: 否", connRow);
+  connRowLayout->addWidget(rtspLight_);
+  connRowLayout->addWidget(rtspStateLabel_);
+
+  tcpLight_ = new QLabel(connRow);
+  tcpLight_->setFixedSize(12, 12);
+  tcpStateLabel_ = new QLabel("TCP: 否", connRow);
+  connRowLayout->addWidget(tcpLight_);
+  connRowLayout->addWidget(tcpStateLabel_);
+
+  bindLight_ = new QLabel(connRow);
+  bindLight_->setFixedSize(12, 12);
+  bindStateLabel_ = new QLabel("绑定: 否", connRow);
+  connRowLayout->addWidget(bindLight_);
+  connRowLayout->addWidget(bindStateLabel_);
+  connRowLayout->addStretch();
+  connLayout->addWidget(connRow);
 
   auto* dataGroup = new QGroupBox("数据接收", rightCol);
   auto* dataLayout = new QVBoxLayout(dataGroup);
 
-  auto* rawGroup = new QGroupBox("原始接收数据摘要（最近20条，单条截断）", dataGroup);
+  auto* rawGroup = new QGroupBox("原始接收", dataGroup);
   auto* rawLayout = new QVBoxLayout(rawGroup);
   recvDataView_ = new QPlainTextEdit(rawGroup);
   recvDataView_->setReadOnly(true);
@@ -600,9 +621,9 @@ void MainWindow::refreshConnectionUi() {
     setLampColor(tcpLight_, "#ef4444");
   }
 
-  if (rtspStateLabel_) rtspStateLabel_->setText(QString("RTSP 是否连接：%1").arg(rtspConnected_ ? "是" : "否"));
-  if (tcpStateLabel_) tcpStateLabel_->setText(QString("TCP 是否连接：%1").arg(tcpConnected_ ? "是" : "否"));
-  if (bindStateLabel_) bindStateLabel_->setText(QString("是否响应绑定：%1").arg(responseBound_ ? "是" : "否"));
+  if (rtspStateLabel_) rtspStateLabel_->setText(QString("RTSP: %1").arg(rtspConnected_ ? "是" : "否"));
+  if (tcpStateLabel_) tcpStateLabel_->setText(QString("TCP: %1").arg(tcpConnected_ ? "是" : "否"));
+  if (bindStateLabel_) bindStateLabel_->setText(QString("绑定: %1").arg(responseBound_ ? "是" : "否"));
 }
 
 void MainWindow::refreshParsedUi(const demo::client::TelemetryPacket& pkt) {
@@ -638,6 +659,8 @@ void MainWindow::refreshParsedUi(const demo::client::TelemetryPacket& pkt) {
                  .arg(alertLowThreshold_, 0, 'f', 2)
                  .arg(alertMidThreshold_, 0, 'f', 2)
                  .arg(alertHighThreshold_, 0, 'f', 2);
+  const auto t = QDateTime::fromMSecsSinceEpoch(pkt.recvTsMs).toString("HH:mm:ss");
+  details << QString("解析时间: %1").arg(t);
   details << QString("objects: %1").arg(pkt.detection.objects.size());
   parsedResultView_->setPlainText(details.join("\n"));
 }
