@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <string>
 
 namespace demo::server {
@@ -10,6 +11,7 @@ public:
 
   bool start();
   void stop();
+  bool check_alive(std::string& reason);
 
   std::string ffmpeg_command() const;
   bool required() const { return required_; }
@@ -19,6 +21,8 @@ private:
   std::string input_path_;
   std::string rtsp_url_;
   bool required_{false};
+
+  mutable std::mutex mu_;
   int child_pid_{-1};
 };
 

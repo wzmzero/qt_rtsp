@@ -92,3 +92,96 @@
    - `release/scripts/run_server.sh`, `run_client.sh`
    - `release/media/test.mp4` + README
    - `release/README_RELEASE.md`
+
+
+## 2026-03-06（sim_server 可靠性修复：TCP/RTSP 解耦 + 自愈）
+
+### 根因分析
+1. **生命周期耦合**：旧实现主线程先 `launcher.start()` 后直接 `TcpSimServer::run()`，TCP/RTSP 缺少独立监督循环，异常恢复能力弱。
+2. **失败即返回**：TCP 在 `bind/listen` 失败时直接返回错误码，导致上层无重试；RTSP 仅做启动期检查，运行中 ffmpeg 退出无法自动恢复。
+3. **可观测性不足**：没有统一健康状态输出，不便定位“哪一侧挂了、重试了几次、最后错误是什么”。
+4. **隐藏 FD 继承风险**：RTSP 进程 fork/exec 时会继承 TCP socket（未设 CLOEXEC），可造成端口占用混淆。
+
+### 修改点
+1. **主进程改为双 supervisor 线程**（彻底解耦）
+   - `run_tcp_loop()`：独立管理 TCP 子系统
+   - `run_rtsp_loop()`：独立管理 RTSP 子系统
+   - 两者互不依赖生命周期；任一失败不会拉垮主进程。
+
+2. **TCP 自愈重试**
+   - `TcpSimServer::run()` 保持单次运行语义；`main` 中 supervisor 对非 0 返回进行重试。
+   - 新增 `--tcp-retry-ms` 可配置重试间隔。
+
+3. **RTSP 自愈重试 + 退避**
+   - `RtspLauncher` 新增 `check_alive()`，检测 ffmpeg 是否中途退出。
+   - supervisor 在启动失败/中途退出时自动重启，采用指数退避（`--rtsp-retry-min-ms/--rtsp-retry-max-ms`）。
+
+4. **异常防护**
+   - TCP/RTSP supervisor 循环与健康输出均加 `try/catch`，异常记录后继续服务。
+
+5. **日志与健康状态**
+   - 统一前缀 `[sim_server][tcp|rtsp|health]`
+   - 打印状态、重试次数、最后错误
+   - 新增 `--health-interval-sec` 控制周期输出
+
+6. **FD 继承修复**
+   - TCP `listen_fd/client_fd` 设置 `FD_CLOEXEC`，避免 ffmpeg 继承 socket。
+
+### 实机测试与证据
+
+1) **mediamtx 复用**
+- 进程已在运行：`ps -fp 36445` -> `./mediamtx`
+
+2) **启动 sim_server（稳定用例）**
+```bash
+stdbuf -oL -eL ./build-release/src/server/sim_server \
+  --tcp-port 9200 \
+  --video media/test.mp4 \
+  --rtsp-url rtsp://127.0.0.1:8554/live_robust \
+  --health-interval-sec 5 \
+  > /tmp/sim_server_robust.log 2>&1
+```
+
+3) **验证 TCP 监听**
+```bash
+ss -lntp | grep ':9200'
+lsof -iTCP:9200 -sTCP:LISTEN -nP
+```
+关键输出：
+- `LISTEN ... 0.0.0.0:9200 ... ("sim_server",pid=37313,fd=3)`
+
+4) **验证 RTSP 发布会话持续 >=20s**
+```bash
+# T0
+lsof -iTCP:8554 -nP | grep ESTABLISHED
+# sleep 22
+# T1
+lsof -iTCP:8554 -nP | grep ESTABLISHED
+```
+关键输出（T0=16:09:51, T1=16:10:13）：
+- T0: `ffmpeg 37316 ... 127.0.0.1:45692->127.0.0.1:8554 (ESTABLISHED)`
+- T1: `ffmpeg 37316 ... 127.0.0.1:45692->127.0.0.1:8554 (ESTABLISHED)`
+
+5) **TCP bind 失败不退出（重试生效）**
+- 以同端口启动第二实例触发冲突，日志持续出现：
+  - `[sim_server][tcp] bind failed: Address already in use`
+  - `[sim_server][tcp] restarting after failure, retry=...`
+  - 同时 RTSP 仍 `RUNNING`
+
+6) **RTSP 启动失败不退出（退避重试生效）**
+- 使用不存在的 ffmpeg：`--ffmpeg /no/such/ffmpeg`
+- 日志持续出现：
+  - `ERROR: exec ffmpeg failed`
+  - `startup failed, retry=1 backoff_ms=500`
+  - `retry=2 backoff_ms=1000`
+  - `retry=3 backoff_ms=2000`（封顶后维持）
+- 同时 TCP 仍 `listening on 0.0.0.0:9300`
+
+### 变更文件
+- `src/server/app/main.cpp`
+- `src/server/network/tcp_sim_server.h`
+- `src/server/network/tcp_sim_server.cpp`
+- `src/server/media/rtsp_launcher.h`
+- `src/server/media/rtsp_launcher.cpp`
+- `README.md`
+- `PROGRESS.md`

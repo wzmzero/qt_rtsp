@@ -8,6 +8,7 @@
 #include <csignal>
 #include <cstring>
 #include <exception>
+#include <fcntl.h>
 #include <iostream>
 #include <netinet/in.h>
 #include <random>
@@ -30,6 +31,11 @@ int TcpSimServer::run() {
       return 1;
     }
     listen_fd_ = listen_fd;
+
+    const int fd_flags = ::fcntl(listen_fd, F_GETFD, 0);
+    if (fd_flags >= 0) {
+      (void)::fcntl(listen_fd, F_SETFD, fd_flags | FD_CLOEXEC);
+    }
 
     int opt = 1;
     (void)setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
@@ -65,6 +71,11 @@ int TcpSimServer::run() {
         std::cerr << "[sim_server][tcp] accept failed: " << std::strerror(errno) << "\n";
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
         continue;
+      }
+
+      const int client_flags = ::fcntl(client_fd, F_GETFD, 0);
+      if (client_flags >= 0) {
+        (void)::fcntl(client_fd, F_SETFD, client_flags | FD_CLOEXEC);
       }
 
       char ip[INET_ADDRSTRLEN]{};

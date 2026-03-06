@@ -103,3 +103,40 @@ cmake --build build-release -j4
 ```
 
 产物目录：`release/`（含 `bin/ conf/ scripts/ media/ README_RELEASE.md`）。
+
+## sim_server 可靠性增强（2026-03-06）
+
+已完成：TCP 与 RTSP 子系统彻底解耦，分别由独立 supervisor 线程管理；任一子系统失败不会导致主进程退出。
+
+### 新增运行参数
+
+```bash
+./build-release/src/server/sim_server \
+  --tcp-port 9200 \
+  --video media/test.mp4 \
+  --rtsp-url rtsp://127.0.0.1:8554/live \
+  --tcp-retry-ms 2000 \
+  --rtsp-retry-min-ms 1000 \
+  --rtsp-retry-max-ms 10000 \
+  --health-interval-sec 5
+```
+
+参数说明：
+- `--tcp-retry-ms`：TCP bind/listen 失败后的固定重试间隔
+- `--rtsp-retry-min-ms / --rtsp-retry-max-ms`：RTSP 推流失败后的指数退避区间
+- `--health-interval-sec`：健康状态打印周期
+
+### 日志与健康状态
+
+启动后会周期打印：
+- TCP 状态（RUNNING/RETRY_WAIT/EXCEPTION/STOPPED）
+- RTSP 状态（RUNNING/RETRY_WAIT/EXCEPTION/STOPPED）
+- 各子系统重试次数
+- 最近一次错误信息
+
+示例：
+
+```
+[sim_server][health] tcp={status:RUNNING,retries:2,last_error:'run() returned non-zero'} rtsp={status:RUNNING,retries:0,last_error:''}
+```
+

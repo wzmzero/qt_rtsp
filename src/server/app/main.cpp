@@ -1,12 +1,16 @@
 #include "media/rtsp_launcher.h"
 #include "network/tcp_sim_server.h"
 
+#include <atomic>
+#include <chrono>
 #include <csignal>
 #include <cstdint>
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 
 namespace {
 
@@ -16,20 +20,38 @@ struct ServerOptions {
   std::string rtsp_url = "rtsp://127.0.0.1:8554/live";
   std::string ffmpeg_path = "ffmpeg";
   bool require_rtsp = false;
+  int tcp_retry_ms = 2000;
+  int rtsp_retry_min_ms = 1000;
+  int rtsp_retry_max_ms = 10000;
+  int health_interval_sec = 5;
 };
 
-std::unique_ptr<demo::server::TcpSimServer> g_server;
+struct SubsystemState {
+  std::string status{"INIT"};
+  int retries{0};
+  std::string last_error{""};
+};
+
+std::atomic<bool> g_running{true};
+std::mutex g_state_mu;
+SubsystemState g_tcp_state;
+SubsystemState g_rtsp_state;
+std::unique_ptr<demo::server::TcpSimServer> g_tcp_server;
 demo::server::RtspLauncher* g_rtsp = nullptr;
 
 void print_usage(const char* prog) {
   std::cout << "Usage: " << prog << " [options]\n"
             << "Options:\n"
-            << "  --tcp-port <port>       TCP simulator port (default: 9000)\n"
-            << "  --video <path>          Input video path (default: media/test.mp4)\n"
-            << "  --rtsp-url <url>        RTSP target URL (default: rtsp://127.0.0.1:8554/live)\n"
-            << "  --ffmpeg <path>         ffmpeg executable path (default: ffmpeg)\n"
-            << "  --require-rtsp          Exit if RTSP pusher startup fails\n"
-            << "  --help                  Show this help\n"
+            << "  --tcp-port <port>            TCP simulator port (default: 9000)\n"
+            << "  --video <path>               Input video path (default: media/test.mp4)\n"
+            << "  --rtsp-url <url>             RTSP target URL (default: rtsp://127.0.0.1:8554/live)\n"
+            << "  --ffmpeg <path>              ffmpeg executable path (default: ffmpeg)\n"
+            << "  --require-rtsp               Exit if RTSP pusher startup fails\n"
+            << "  --tcp-retry-ms <ms>          TCP bind/listen retry interval (default: 2000)\n"
+            << "  --rtsp-retry-min-ms <ms>     RTSP restart min backoff (default: 1000)\n"
+            << "  --rtsp-retry-max-ms <ms>     RTSP restart max backoff (default: 10000)\n"
+            << "  --health-interval-sec <sec>  Health log interval (default: 5)\n"
+            << "  --help                       Show this help\n"
             << "\n"
             << "Compatibility (legacy positional):\n"
             << "  " << prog << " [tcp_port] [video_path]\n";
@@ -37,7 +59,6 @@ void print_usage(const char* prog) {
 
 bool parse_options(int argc, char** argv, ServerOptions& opts) {
   bool saw_named = false;
-
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
     if (arg == "--help" || arg == "-h") {
@@ -45,37 +66,25 @@ bool parse_options(int argc, char** argv, ServerOptions& opts) {
       return false;
     }
     if (arg == "--tcp-port") {
-      if (i + 1 >= argc) {
-        std::cerr << "Missing value for --tcp-port\n";
-        return false;
-      }
+      if (i + 1 >= argc) return false;
       opts.tcp_port = static_cast<std::uint16_t>(std::stoi(argv[++i]));
       saw_named = true;
       continue;
     }
     if (arg == "--video") {
-      if (i + 1 >= argc) {
-        std::cerr << "Missing value for --video\n";
-        return false;
-      }
+      if (i + 1 >= argc) return false;
       opts.video_path = argv[++i];
       saw_named = true;
       continue;
     }
     if (arg == "--rtsp-url") {
-      if (i + 1 >= argc) {
-        std::cerr << "Missing value for --rtsp-url\n";
-        return false;
-      }
+      if (i + 1 >= argc) return false;
       opts.rtsp_url = argv[++i];
       saw_named = true;
       continue;
     }
     if (arg == "--ffmpeg") {
-      if (i + 1 >= argc) {
-        std::cerr << "Missing value for --ffmpeg\n";
-        return false;
-      }
+      if (i + 1 >= argc) return false;
       opts.ffmpeg_path = argv[++i];
       saw_named = true;
       continue;
@@ -85,34 +94,165 @@ bool parse_options(int argc, char** argv, ServerOptions& opts) {
       saw_named = true;
       continue;
     }
-
-    if (!arg.empty() && arg[0] == '-') {
-      std::cerr << "Unknown option: " << arg << "\n";
-      return false;
+    if (arg == "--tcp-retry-ms") {
+      if (i + 1 >= argc) return false;
+      opts.tcp_retry_ms = std::stoi(argv[++i]);
+      saw_named = true;
+      continue;
+    }
+    if (arg == "--rtsp-retry-min-ms") {
+      if (i + 1 >= argc) return false;
+      opts.rtsp_retry_min_ms = std::stoi(argv[++i]);
+      saw_named = true;
+      continue;
+    }
+    if (arg == "--rtsp-retry-max-ms") {
+      if (i + 1 >= argc) return false;
+      opts.rtsp_retry_max_ms = std::stoi(argv[++i]);
+      saw_named = true;
+      continue;
+    }
+    if (arg == "--health-interval-sec") {
+      if (i + 1 >= argc) return false;
+      opts.health_interval_sec = std::stoi(argv[++i]);
+      saw_named = true;
+      continue;
     }
 
-    if (saw_named) {
-      std::cerr << "Positional arguments cannot be mixed with named options: " << arg << "\n";
-      return false;
-    }
-
-    // legacy positional mode: [tcp_port] [video_path]
+    if (!arg.empty() && arg[0] == '-') return false;
+    if (saw_named) return false;
     if (i == 1) {
       opts.tcp_port = static_cast<std::uint16_t>(std::stoi(arg));
     } else if (i == 2) {
       opts.video_path = arg;
     } else {
-      std::cerr << "Too many positional arguments\n";
       return false;
     }
   }
 
+  if (opts.tcp_retry_ms < 100) opts.tcp_retry_ms = 100;
+  if (opts.rtsp_retry_min_ms < 100) opts.rtsp_retry_min_ms = 100;
+  if (opts.rtsp_retry_max_ms < opts.rtsp_retry_min_ms) opts.rtsp_retry_max_ms = opts.rtsp_retry_min_ms;
+  if (opts.health_interval_sec < 1) opts.health_interval_sec = 1;
   return true;
 }
 
-void on_sigint(int) {
-  if (g_server) g_server->stop();
+void update_state(SubsystemState& state, const std::string& status, const std::string& last_error = "", bool retry_inc = false) {
+  std::lock_guard<std::mutex> lk(g_state_mu);
+  state.status = status;
+  if (!last_error.empty()) state.last_error = last_error;
+  if (retry_inc) state.retries += 1;
+}
+
+void on_signal(int) {
+  g_running = false;
+  if (g_tcp_server) g_tcp_server->stop();
   if (g_rtsp) g_rtsp->stop();
+}
+
+void run_tcp_loop(ServerOptions opts) {
+  while (g_running) {
+    try {
+      update_state(g_tcp_state, "STARTING");
+      auto server = std::make_unique<demo::server::TcpSimServer>(opts.tcp_port);
+      g_tcp_server = std::move(server);
+      update_state(g_tcp_state, "RUNNING");
+      const int ret = g_tcp_server->run();
+      g_tcp_server.reset();
+
+      if (!g_running) break;
+      if (ret == 0) {
+        update_state(g_tcp_state, "STOPPED");
+        continue;
+      }
+
+      update_state(g_tcp_state, "RETRY_WAIT", "run() returned non-zero", true);
+      std::cerr << "[sim_server][tcp] restarting after failure, retry=" << g_tcp_state.retries
+                << " next_wait_ms=" << opts.tcp_retry_ms << "\n";
+      std::this_thread::sleep_for(std::chrono::milliseconds(opts.tcp_retry_ms));
+    } catch (const std::exception& e) {
+      update_state(g_tcp_state, "EXCEPTION", e.what(), true);
+      std::cerr << "[sim_server][tcp] EXCEPTION in supervisor: " << e.what() << "\n";
+      std::this_thread::sleep_for(std::chrono::milliseconds(opts.tcp_retry_ms));
+    } catch (...) {
+      update_state(g_tcp_state, "EXCEPTION", "unknown exception", true);
+      std::cerr << "[sim_server][tcp] EXCEPTION in supervisor: unknown\n";
+      std::this_thread::sleep_for(std::chrono::milliseconds(opts.tcp_retry_ms));
+    }
+  }
+  update_state(g_tcp_state, "STOPPED");
+}
+
+void run_rtsp_loop(ServerOptions opts) {
+  demo::server::RtspLauncher launcher(opts.ffmpeg_path, opts.video_path, opts.rtsp_url, opts.require_rtsp);
+  g_rtsp = &launcher;
+
+  int backoff_ms = opts.rtsp_retry_min_ms;
+  while (g_running) {
+    try {
+      update_state(g_rtsp_state, "STARTING");
+      const bool ok = launcher.start();
+      if (!ok) {
+        if (launcher.required()) {
+          update_state(g_rtsp_state, "FAILED_REQUIRED", "startup failed with --require-rtsp", true);
+          std::cerr << "[sim_server][rtsp] required startup failed, but process keeps running by design\n";
+        } else {
+          update_state(g_rtsp_state, "RETRY_WAIT", "startup failed", true);
+        }
+        std::cerr << "[sim_server][rtsp] startup failed, retry=" << g_rtsp_state.retries
+                  << " backoff_ms=" << backoff_ms << "\n";
+        std::this_thread::sleep_for(std::chrono::milliseconds(backoff_ms));
+        backoff_ms = std::min(backoff_ms * 2, opts.rtsp_retry_max_ms);
+        continue;
+      }
+
+      update_state(g_rtsp_state, "RUNNING");
+      backoff_ms = opts.rtsp_retry_min_ms;
+
+      while (g_running) {
+        std::string reason;
+        if (!launcher.check_alive(reason)) {
+          update_state(g_rtsp_state, "RETRY_WAIT", reason, true);
+          std::cerr << "[sim_server][rtsp] pusher exited: " << reason << ", retry=" << g_rtsp_state.retries
+                    << " backoff_ms=" << backoff_ms << "\n";
+          std::this_thread::sleep_for(std::chrono::milliseconds(backoff_ms));
+          backoff_ms = std::min(backoff_ms * 2, opts.rtsp_retry_max_ms);
+          break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      }
+
+      launcher.stop();
+    } catch (const std::exception& e) {
+      update_state(g_rtsp_state, "EXCEPTION", e.what(), true);
+      std::cerr << "[sim_server][rtsp] EXCEPTION in supervisor: " << e.what() << "\n";
+      std::this_thread::sleep_for(std::chrono::milliseconds(backoff_ms));
+      backoff_ms = std::min(backoff_ms * 2, opts.rtsp_retry_max_ms);
+    } catch (...) {
+      update_state(g_rtsp_state, "EXCEPTION", "unknown exception", true);
+      std::cerr << "[sim_server][rtsp] EXCEPTION in supervisor: unknown\n";
+      std::this_thread::sleep_for(std::chrono::milliseconds(backoff_ms));
+      backoff_ms = std::min(backoff_ms * 2, opts.rtsp_retry_max_ms);
+    }
+  }
+
+  launcher.stop();
+  g_rtsp = nullptr;
+  update_state(g_rtsp_state, "STOPPED");
+}
+
+void print_health() {
+  SubsystemState tcp;
+  SubsystemState rtsp;
+  {
+    std::lock_guard<std::mutex> lk(g_state_mu);
+    tcp = g_tcp_state;
+    rtsp = g_rtsp_state;
+  }
+
+  std::cout << "[sim_server][health] tcp={status:" << tcp.status << ",retries:" << tcp.retries
+            << ",last_error:'" << tcp.last_error << "'} rtsp={status:" << rtsp.status << ",retries:" << rtsp.retries
+            << ",last_error:'" << rtsp.last_error << "'}\n";
 }
 
 } // namespace
@@ -121,6 +261,7 @@ int main(int argc, char** argv) {
   ServerOptions opts;
   try {
     if (!parse_options(argc, argv, opts)) {
+      print_usage(argv[0]);
       return 1;
     }
   } catch (const std::exception& e) {
@@ -129,26 +270,31 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  demo::server::RtspLauncher launcher(opts.ffmpeg_path, opts.video_path, opts.rtsp_url, opts.require_rtsp);
-  g_rtsp = &launcher;
+  std::signal(SIGINT, on_signal);
+  std::signal(SIGTERM, on_signal);
 
-  std::signal(SIGINT, on_sigint);
-  std::signal(SIGTERM, on_sigint);
+  std::cout << "[sim_server] starting supervisors (tcp + rtsp decoupled)\n";
 
-  const bool rtsp_ok = launcher.start();
-  if (!rtsp_ok) {
-    if (launcher.required()) {
-      std::cerr << "[sim_server] RTSP startup failed and --require-rtsp is set, exiting.\n";
-      return 2;
+  std::thread tcp_thread(run_tcp_loop, opts);
+  std::thread rtsp_thread(run_rtsp_loop, opts);
+
+  while (g_running) {
+    try {
+      print_health();
+    } catch (const std::exception& e) {
+      std::cerr << "[sim_server][health] EXCEPTION: " << e.what() << "\n";
+    } catch (...) {
+      std::cerr << "[sim_server][health] EXCEPTION: unknown\n";
     }
-    std::cerr << "[sim_server] WARN: RTSP startup failed, TCP simulator will continue running.\n";
+    std::this_thread::sleep_for(std::chrono::seconds(opts.health_interval_sec));
   }
 
-  g_server = std::make_unique<demo::server::TcpSimServer>(opts.tcp_port);
-  std::cout << "[sim_server] Start telemetry simulator on port " << opts.tcp_port << "\n";
+  if (g_tcp_server) g_tcp_server->stop();
+  if (g_rtsp) g_rtsp->stop();
 
-  const int ret = g_server->run();
-  launcher.stop();
-  g_rtsp = nullptr;
-  return ret;
+  if (tcp_thread.joinable()) tcp_thread.join();
+  if (rtsp_thread.joinable()) rtsp_thread.join();
+
+  std::cout << "[sim_server] stopped\n";
+  return 0;
 }

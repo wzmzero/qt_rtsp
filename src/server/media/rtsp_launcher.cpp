@@ -1,9 +1,9 @@
 #include "media/rtsp_launcher.h"
 
 #include <cerrno>
+#include <chrono>
 #include <csignal>
 #include <cstring>
-#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -28,15 +28,18 @@ std::string RtspLauncher::ffmpeg_command() const {
 }
 
 bool RtspLauncher::start() {
-  if (child_pid_ > 0) {
-    return true;
+  {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (child_pid_ > 0) {
+      return true;
+    }
   }
 
-  std::cout << "[sim_server] Starting RTSP pusher:\n  " << ffmpeg_command() << "\n";
+  std::cout << "[sim_server][rtsp] starting pusher:\n  " << ffmpeg_command() << "\n";
 
   const pid_t pid = ::fork();
   if (pid < 0) {
-    std::cerr << "[sim_server] ERROR: fork ffmpeg process failed: " << std::strerror(errno) << "\n";
+    std::cerr << "[sim_server][rtsp] ERROR: fork ffmpeg failed: " << std::strerror(errno) << "\n";
     return false;
   }
 
@@ -64,11 +67,14 @@ bool RtspLauncher::start() {
 
     ::execvp(ffmpeg_path_.c_str(), args.data());
 
-    std::cerr << "[sim_server] ERROR: exec ffmpeg failed: " << std::strerror(errno) << "\n";
+    std::cerr << "[sim_server][rtsp] ERROR: exec ffmpeg failed: " << std::strerror(errno) << "\n";
     _exit(127);
   }
 
-  child_pid_ = static_cast<int>(pid);
+  {
+    std::lock_guard<std::mutex> lk(mu_);
+    child_pid_ = static_cast<int>(pid);
+  }
 
   int status = 0;
   for (int i = 0; i < 8; ++i) {
@@ -78,37 +84,82 @@ bool RtspLauncher::start() {
       continue;
     }
     if (ret == pid) {
+      std::lock_guard<std::mutex> lk(mu_);
       child_pid_ = -1;
       if (WIFEXITED(status)) {
-        std::cerr << "[sim_server] ERROR: ffmpeg exited immediately with code " << WEXITSTATUS(status)
-                  << ". Please check ffmpeg path/input/RTSP URL.\n";
+        std::cerr << "[sim_server][rtsp] ERROR: ffmpeg exited quickly with code " << WEXITSTATUS(status) << "\n";
       } else if (WIFSIGNALED(status)) {
-        std::cerr << "[sim_server] ERROR: ffmpeg terminated by signal " << WTERMSIG(status) << ".\n";
+        std::cerr << "[sim_server][rtsp] ERROR: ffmpeg terminated by signal " << WTERMSIG(status) << "\n";
       } else {
-        std::cerr << "[sim_server] ERROR: ffmpeg exited unexpectedly.\n";
+        std::cerr << "[sim_server][rtsp] ERROR: ffmpeg exited unexpectedly\n";
       }
       return false;
     }
 
-    std::cerr << "[sim_server] ERROR: waitpid failed while checking ffmpeg startup: " << std::strerror(errno) << "\n";
+    std::cerr << "[sim_server][rtsp] ERROR: waitpid startup check failed: " << std::strerror(errno) << "\n";
+    std::lock_guard<std::mutex> lk(mu_);
     child_pid_ = -1;
     return false;
   }
 
-  std::cout << "[sim_server] RTSP pusher started (pid=" << child_pid_ << ")\n";
+  std::cout << "[sim_server][rtsp] pusher started (pid=" << pid << ")\n";
   return true;
 }
 
-void RtspLauncher::stop() {
-  if (child_pid_ <= 0) {
-    return;
+bool RtspLauncher::check_alive(std::string& reason) {
+  pid_t pid = -1;
+  {
+    std::lock_guard<std::mutex> lk(mu_);
+    pid = child_pid_;
+  }
+  if (pid <= 0) {
+    reason = "ffmpeg not running";
+    return false;
   }
 
-  const pid_t pid = static_cast<pid_t>(child_pid_);
+  int status = 0;
+  const pid_t ret = ::waitpid(pid, &status, WNOHANG);
+  if (ret == 0) {
+    return true;
+  }
+
+  {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (child_pid_ == pid) child_pid_ = -1;
+  }
+
+  if (ret == pid) {
+    if (WIFEXITED(status)) {
+      reason = "ffmpeg exited with code " + std::to_string(WEXITSTATUS(status));
+    } else if (WIFSIGNALED(status)) {
+      reason = "ffmpeg killed by signal " + std::to_string(WTERMSIG(status));
+    } else {
+      reason = "ffmpeg exited unexpectedly";
+    }
+    return false;
+  }
+
+  if (errno == ECHILD) {
+    reason = "ffmpeg child already reaped";
+    return false;
+  }
+
+  reason = std::string("waitpid failed: ") + std::strerror(errno);
+  return false;
+}
+
+void RtspLauncher::stop() {
+  pid_t pid = -1;
+  {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (child_pid_ <= 0) {
+      return;
+    }
+    pid = static_cast<pid_t>(child_pid_);
+  }
 
   if (::kill(pid, SIGTERM) != 0 && errno != ESRCH) {
-    std::cerr << "[sim_server] WARN: failed to SIGTERM ffmpeg(pid=" << child_pid_ << "): " << std::strerror(errno)
-              << "\n";
+    std::cerr << "[sim_server][rtsp] WARN: SIGTERM ffmpeg(" << pid << ") failed: " << std::strerror(errno) << "\n";
   }
 
   int status = 0;
@@ -131,14 +182,17 @@ void RtspLauncher::stop() {
   }
 
   if (!exited) {
-    std::cerr << "[sim_server] WARN: ffmpeg did not exit in time, sending SIGKILL (pid=" << child_pid_ << ")\n";
+    std::cerr << "[sim_server][rtsp] WARN: ffmpeg did not exit in time, sending SIGKILL (pid=" << pid << ")\n";
     if (::kill(pid, SIGKILL) == 0) {
       (void)::waitpid(pid, &status, 0);
     }
   }
 
-  std::cout << "[sim_server] RTSP pusher stopped\n";
-  child_pid_ = -1;
+  {
+    std::lock_guard<std::mutex> lk(mu_);
+    child_pid_ = -1;
+  }
+  std::cout << "[sim_server][rtsp] pusher stopped\n";
 }
 
 } // namespace demo::server
