@@ -591,7 +591,7 @@ void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
   item.frameTsMs = tsMs;
   item.frame = frame;
   item.telemetry = lastPkt_;
-  QMetaObject::invokeMethod(recorder_, "enqueue", Qt::QueuedConnection, Q_ARG(demo::client::RecordItem, item));
+  QMetaObject::invokeMethod(recorder_, [this, item]() { recorder_->enqueue(item); }, Qt::QueuedConnection);
 }
 
 void MainWindow::onConnectionStateChanged(const QString& state) {

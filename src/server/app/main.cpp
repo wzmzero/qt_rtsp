@@ -23,7 +23,7 @@ struct ServerOptions {
   int tcp_retry_ms = 2000;
   int rtsp_retry_min_ms = 1000;
   int rtsp_retry_max_ms = 10000;
-  int health_interval_sec = 5;
+  int health_interval_sec = 0;
 };
 
 struct SubsystemState {
@@ -50,7 +50,7 @@ void print_usage(const char* prog) {
             << "  --tcp-retry-ms <ms>          TCP bind/listen retry interval (default: 2000)\n"
             << "  --rtsp-retry-min-ms <ms>     RTSP restart min backoff (default: 1000)\n"
             << "  --rtsp-retry-max-ms <ms>     RTSP restart max backoff (default: 10000)\n"
-            << "  --health-interval-sec <sec>  Health log interval (default: 5)\n"
+            << "  --health-interval-sec <sec>  Health log interval; 0 disables (default: 0)\n"
             << "  --help                       Show this help\n"
             << "\n"
             << "Compatibility (legacy positional):\n"
@@ -133,7 +133,7 @@ bool parse_options(int argc, char** argv, ServerOptions& opts) {
   if (opts.tcp_retry_ms < 100) opts.tcp_retry_ms = 100;
   if (opts.rtsp_retry_min_ms < 100) opts.rtsp_retry_min_ms = 100;
   if (opts.rtsp_retry_max_ms < opts.rtsp_retry_min_ms) opts.rtsp_retry_max_ms = opts.rtsp_retry_min_ms;
-  if (opts.health_interval_sec < 1) opts.health_interval_sec = 1;
+  if (opts.health_interval_sec < 0) opts.health_interval_sec = 0;
   return true;
 }
 
@@ -279,14 +279,18 @@ int main(int argc, char** argv) {
   std::thread rtsp_thread(run_rtsp_loop, opts);
 
   while (g_running) {
-    try {
-      print_health();
-    } catch (const std::exception& e) {
-      std::cerr << "[sim_server][health] EXCEPTION: " << e.what() << "\n";
-    } catch (...) {
-      std::cerr << "[sim_server][health] EXCEPTION: unknown\n";
+    if (opts.health_interval_sec > 0) {
+      try {
+        print_health();
+      } catch (const std::exception& e) {
+        std::cerr << "[sim_server][health] EXCEPTION: " << e.what() << "\n";
+      } catch (...) {
+        std::cerr << "[sim_server][health] EXCEPTION: unknown\n";
+      }
+      std::this_thread::sleep_for(std::chrono::seconds(opts.health_interval_sec));
+    } else {
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    std::this_thread::sleep_for(std::chrono::seconds(opts.health_interval_sec));
   }
 
   if (g_tcp_server) g_tcp_server->stop();

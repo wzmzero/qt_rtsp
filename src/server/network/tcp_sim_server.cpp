@@ -83,7 +83,6 @@ int TcpSimServer::run() {
       std::cout << "[sim_server][tcp] client connected: " << ip << ":" << ntohs(cli.sin_port) << "\n";
 
       std::mt19937 rng{std::random_device{}()};
-      std::uniform_real_distribution<double> conf(0.35, 0.99);
       std::uniform_int_distribution<int> shift(-30, 30);
 
       int seq = 0;
@@ -91,31 +90,24 @@ int TcpSimServer::run() {
         const auto now_ms = demo::core::now_ms();
 
         demo::protocol::Detection d;
-        d.label = "person+rod";
-        d.confidence = 0.90;
+        d.label = "person";
+        d.confidence = 0.95;
         d.source_ts_ms = now_ms - 15;
 
-        // YOLO normalized bbox: cx,cy,w,h in [0,1]
-        const bool closePair = (seq % 3 != 0);
-        const double personCx = 0.28 + (seq % 8) * 0.02;
-        const double personCy = 0.36;
+        // 固定标签与置信度：仅 person + rod
+        const double personCx = 0.36 + (seq % 6) * 0.015;
+        const double personCy = 0.38;
         const double personW = 0.30;
         const double personH = 0.44;
-        const double rodCx = closePair ? (personCx + 0.01) : (personCx + 0.28);
-        const double rodCy = closePair ? (personCy + 0.01) : (personCy + 0.20);
+        const double rodCx = personCx + 0.02;
+        const double rodCy = personCy + 0.02;
 
-        const int level = seq % 3; // 0 low,1 mid,2 high
-        const double personConf = (level == 0) ? 0.56 : (level == 1 ? 0.74 : 0.90);
-        const double rodConf = (level == 0) ? 0.53 : (level == 1 ? 0.76 : 0.88);
+        constexpr double personConf = 0.92;
+        constexpr double rodConf = 0.88;
         demo::protocol::DetectionObject person{"person", personConf, personCx, personCy, personW, personH};
         demo::protocol::DetectionObject rod{"rod", rodConf, rodCx, rodCy, 0.28, 0.13};
-        demo::protocol::DetectionObject boat{"boat", conf(rng), 0.70, 0.42, 0.26, 0.20};
-        demo::protocol::DetectionObject buoy{"buoy", conf(rng), 0.12 + (seq % 5) * 0.03, 0.70, 0.08, 0.10};
         d.objects.push_back(person);
         d.objects.push_back(rod);
-        d.objects.push_back(boat);
-        if (seq % 2 == 0) d.objects.push_back(buoy);
-
         demo::protocol::Gps g;
         g.time_usec = static_cast<std::int64_t>(now_ms) * 1000;
         g.lat_e7 = 311234567 + shift(rng);
@@ -131,7 +123,6 @@ int TcpSimServer::run() {
         const auto line = demo::protocol::to_json_line(d, g, now_ms);
         const auto ret = ::send(client_fd, line.data(), line.size(), MSG_NOSIGNAL);
         if (ret <= 0) {
-          std::cerr << "[sim_server][tcp] send failed / client disconnected\n";
           break;
         }
 
