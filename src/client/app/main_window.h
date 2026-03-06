@@ -143,7 +143,6 @@ private:
   QList<LogEntry> logEntries_;
 
   QThread tcpThread_;
-  QThread streamThread_;
   QThread recordThread_;
   QThread dbThread_;
 

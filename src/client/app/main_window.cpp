@@ -112,13 +112,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   recorder_ = new demo::client::RecordWorker();
 
   tcp_->moveToThread(&tcpThread_);
-  stream_->moveToThread(&streamThread_);
   recorder_->moveToThread(&recordThread_);
   db_->moveToThread(&dbThread_);
 
   connect(&tcpThread_, &QThread::finished, tcp_, &QObject::deleteLater);
-  connect(&streamThread_, &QThread::finished, stream_, &QObject::deleteLater);
   connect(&recordThread_, &QThread::finished, recorder_, &QObject::deleteLater);
+  connect(this, &QObject::destroyed, stream_, &QObject::deleteLater);
   connect(&dbThread_, &QThread::finished, db_, &QObject::deleteLater);
 
   connect(tcp_, &demo::client::TcpClientWorker::telemetryReceived, this, &MainWindow::onTelemetry);
@@ -132,7 +131,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
           &demo::client::SQLiteDatabaseService::insertPlaybackIndexAsync, Qt::QueuedConnection);
 
   tcpThread_.start();
-  streamThread_.start();
   recordThread_.start();
   dbThread_.start();
 
@@ -173,12 +171,10 @@ MainWindow::~MainWindow() {
   repo_->saveConfig(config_);
 
   tcpThread_.quit();
-  streamThread_.quit();
   recordThread_.quit();
   dbThread_.quit();
 
   tcpThread_.wait();
-  streamThread_.wait();
   recordThread_.wait();
   dbThread_.wait();
 }
@@ -513,7 +509,7 @@ void MainWindow::onStartAll() {
   const QString runtimeRecordDir = resolvePath(config_.recordDir, "./recordings");
   QMetaObject::invokeMethod(tcp_, "start", Qt::QueuedConnection, Q_ARG(QString, config_.tcpHost),
                             Q_ARG(quint16, config_.tcpPort), Q_ARG(int, config_.reconnectIntervalMs));
-  QMetaObject::invokeMethod(stream_, "start", Qt::QueuedConnection, Q_ARG(QUrl, QUrl(config_.rtspUrl)));
+  stream_->start(QUrl(config_.rtspUrl));
   if (config_.recordEnabled) QMetaObject::invokeMethod(recorder_, "start", Qt::QueuedConnection, Q_ARG(QString, runtimeRecordDir));
 
   statusBar()->showMessage(QString("运行中 | DB: %1").arg(dbDisplayPath_));
@@ -524,7 +520,7 @@ void MainWindow::onStartAll() {
 
 void MainWindow::onStopAll() {
   QMetaObject::invokeMethod(tcp_, "stop", Qt::QueuedConnection);
-  QMetaObject::invokeMethod(stream_, "stop", Qt::QueuedConnection);
+  stream_->stop();
   QMetaObject::invokeMethod(recorder_, "stop", Qt::QueuedConnection);
   rtspConnected_ = false;
   tcpConnected_ = false;
