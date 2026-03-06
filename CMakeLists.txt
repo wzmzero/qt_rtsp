@@ -10,6 +10,7 @@ set(CMAKE_AUTOUIC ON)
 option(BUILD_CLIENT "Build Qt client" ON)
 option(BUILD_SERVER "Build std:: server" ON)
 option(BUILD_MEDIA_CORE "Build standalone media core/test" ON)
+option(BUILD_TESTS "Build C++ tests" ON)
 
 add_subdirectory(src/common)
 
@@ -23,4 +24,8 @@ endif()
 
 if(BUILD_CLIENT)
   add_subdirectory(src/client)
+endif()
+
+if(BUILD_TESTS)
+  add_subdirectory(tests)
 endif()
