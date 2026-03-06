@@ -1,13 +1,14 @@
 #include "app/main_window.h"
 
+#include "database/database_service.h"
 #include "media/record_worker.h"
 #include "media/stream_worker.h"
 #include "network/tcp_client_worker.h"
+#include "repository/app_repository.h"
 
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
-#include <QComboBox>
 #include <QDateTime>
 #include <QDir>
 #include <QFileDialog>
@@ -34,6 +35,10 @@
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   settings_ = new QSettings("qt_rtsp_tcp_project", "qt_client", this);
+  const auto dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+  db_ = new demo::client::SQLiteDatabaseService(dataDir + "/client_data.sqlite");
+  repo_ = new demo::client::AppRepository(db_, settings_, this);
 
   setupUi();
   setupMenus();
@@ -45,10 +50,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   tcp_->moveToThread(&tcpThread_);
   stream_->moveToThread(&streamThread_);
   recorder_->moveToThread(&recordThread_);
+  db_->moveToThread(&dbThread_);
 
   connect(&tcpThread_, &QThread::finished, tcp_, &QObject::deleteLater);
   connect(&streamThread_, &QThread::finished, stream_, &QObject::deleteLater);
   connect(&recordThread_, &QThread::finished, recorder_, &QObject::deleteLater);
+  connect(&dbThread_, &QThread::finished, db_, &QObject::deleteLater);
 
   connect(tcp_, &demo::client::TcpClientWorker::telemetryReceived, this, &MainWindow::onTelemetry);
   connect(tcp_, &demo::client::TcpClientWorker::connectionStateChanged, this, &MainWindow::onConnectionStateChanged);
@@ -61,10 +68,21 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   tcpThread_.start();
   streamThread_.start();
   recordThread_.start();
+  dbThread_.start();
 
-  config_ = loadConfigFromSettings();
+  bool dbReady = false;
+  QMetaObject::invokeMethod(
+      db_,
+      [&dbReady, this]() {
+        dbReady = db_->initialize();
+      },
+      Qt::BlockingQueuedConnection);
+  if (!dbReady) {
+    onLog("WARNING: SQLite 初始化失败，配置/结果将仅保存在 QSettings");
+  }
+
+  config_ = repo_->loadConfig();
   if (config_.recordDir.isEmpty()) {
-    const auto dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     config_.recordDir = dataDir + "/records";
   }
   applyConfigToUi(config_);
@@ -85,15 +103,17 @@ MainWindow::~MainWindow() {
   config_ = collectConfigFromUi();
   config_.windowGeometry = saveGeometry();
   config_.windowState = saveState();
-  saveConfigToSettings(config_);
+  repo_->saveConfig(config_);
 
   tcpThread_.quit();
   streamThread_.quit();
   recordThread_.quit();
+  dbThread_.quit();
 
   tcpThread_.wait();
   streamThread_.wait();
   recordThread_.wait();
+  dbThread_.wait();
 }
 
 void MainWindow::setupMenus() {
@@ -233,7 +253,7 @@ void MainWindow::setupUi() {
 
 void MainWindow::onStartAll() {
   config_ = collectConfigFromUi();
-  saveConfigToSettings(config_);
+  repo_->saveConfig(config_);
 
   QMetaObject::invokeMethod(tcp_, "start", Qt::QueuedConnection, Q_ARG(QString, config_.tcpHost),
                             Q_ARG(quint16, config_.tcpPort), Q_ARG(int, config_.reconnectIntervalMs));
@@ -258,9 +278,9 @@ void MainWindow::onSaveConfig() {
   config_ = collectConfigFromUi();
   config_.windowGeometry = saveGeometry();
   config_.windowState = saveState();
-  saveConfigToSettings(config_);
+  repo_->saveConfig(config_);
   applyTheme(config_.theme);
-  onLog("Config saved to QSettings");
+  onLog("Config saved to QSettings + SQLite");
 }
 
 void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
@@ -268,6 +288,8 @@ void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
   tsLabel_->setText(QString("时间戳: source=%1 sent=%2 recv=%3").arg(pkt.detection.sourceTsMs).arg(pkt.sentTsMs).arg(pkt.recvTsMs));
   detectionLabel_->setText(QString("检测结果: %1 (%.2f)").arg(pkt.detection.label).arg(pkt.detection.confidence, 0, 'f', 2));
   gpsLabel_->setText(QString("GPS: %1,%2 alt=%3 sat=%4").arg(pkt.gps.latE7).arg(pkt.gps.lonE7).arg(pkt.gps.altMm).arg(pkt.gps.satellitesVisible));
+
+  repo_->appendTelemetry(pkt);
 }
 
 void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
@@ -322,31 +344,4 @@ void MainWindow::applyTheme(const QString& theme) {
   } else {
     qApp->setStyleSheet("QMainWindow{background:#1e293b;color:#e2e8f0;} QGroupBox{font-weight:600;border:1px solid #475569;border-radius:8px;margin-top:12px;padding-top:8px;} QLabel{color:#e2e8f0;} QLineEdit,QSpinBox,QComboBox,QPlainTextEdit{background:#0f172a;color:#e2e8f0;border:1px solid #334155;padding:4px;} QPushButton{background:#334155;color:#e2e8f0;padding:6px 12px;border-radius:4px;} QPushButton:hover{background:#475569;}");
   }
-}
-
-demo::client::AppConfig MainWindow::loadConfigFromSettings() const {
-  demo::client::AppConfig cfg;
-  cfg.rtspUrl = settings_->value("connection/rtsp_url", cfg.rtspUrl).toString();
-  cfg.tcpHost = settings_->value("connection/tcp_host", cfg.tcpHost).toString();
-  cfg.tcpPort = settings_->value("connection/tcp_port", cfg.tcpPort).toUInt();
-  cfg.reconnectIntervalMs = settings_->value("connection/reconnect_ms", cfg.reconnectIntervalMs).toInt();
-  cfg.recordDir = settings_->value("record/dir", cfg.recordDir).toString();
-  cfg.recordEnabled = settings_->value("record/enabled", cfg.recordEnabled).toBool();
-  cfg.theme = settings_->value("view/theme", cfg.theme).toString();
-  cfg.windowGeometry = settings_->value("view/window_geometry", cfg.windowGeometry).toByteArray();
-  cfg.windowState = settings_->value("view/window_state", cfg.windowState).toByteArray();
-  return cfg;
-}
-
-void MainWindow::saveConfigToSettings(const demo::client::AppConfig& cfg) {
-  settings_->setValue("connection/rtsp_url", cfg.rtspUrl);
-  settings_->setValue("connection/tcp_host", cfg.tcpHost);
-  settings_->setValue("connection/tcp_port", cfg.tcpPort);
-  settings_->setValue("connection/reconnect_ms", cfg.reconnectIntervalMs);
-  settings_->setValue("record/dir", cfg.recordDir);
-  settings_->setValue("record/enabled", cfg.recordEnabled);
-  settings_->setValue("view/theme", cfg.theme);
-  settings_->setValue("view/window_geometry", cfg.windowGeometry);
-  settings_->setValue("view/window_state", cfg.windowState);
-  settings_->sync();
 }
