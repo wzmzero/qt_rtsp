@@ -12,31 +12,22 @@ message DetectionObject {
   double h = 7;            // 目标框高度（归一化）
 }
 
-message Detection {
-  string label = 1;                    // 整帧检测摘要标签（可用 "multi"）
-  double confidence = 2;               // 整帧检测摘要置信度
-  int64 source_ts_ms = 3;              // 检测算法输出时间戳（毫秒）
-  repeated DetectionObject objects = 4;// 多目标检测结果列表
-}
-
 message Gps {
-  int64 time_usec = 1;          // GPS 时间戳（微秒）
-  int32 lat_e7 = 2;             // 纬度 E7（真实值=lat_e7/1e7）
-  int32 lon_e7 = 3;             // 经度 E7（真实值=lon_e7/1e7）
-  int32 alt_mm = 4;             // 海拔（毫米）
-  int32 eph_cm = 5;             // 水平精度估计（厘米）
-  int32 epv_cm = 6;             // 垂直精度估计（厘米）
-  int32 vel_cms = 7;            // 地速（厘米/秒）
-  int32 cog_cdeg = 8;           // 航向（0.01度）
-  uint32 fix_type = 9;          // 定位类型（如 3=3D fix）
+  int64 time_usec = 1;           // GPS 时间戳（微秒）
+  int32 lat_e7 = 2;              // 纬度 E7（真实值=lat_e7/1e7）
+  int32 lon_e7 = 3;              // 经度 E7（真实值=lon_e7/1e7）
+  int32 alt_mm = 4;              // 海拔（毫米）
+  int32 eph_cm = 5;              // 水平精度估计（厘米）
+  int32 epv_cm = 6;              // 垂直精度估计（厘米）
+  int32 vel_cms = 7;             // 地速（厘米/秒）
+  int32 cog_cdeg = 8;            // 航向（0.01度）
+  uint32 fix_type = 9;           // 定位类型（如 3=3D fix）
   uint32 satellites_visible = 10;// 可见卫星数
 }
 
 message Telemetry {
-  string type = 1;      // 消息类型（当前固定 "telemetry"）
-  uint32 version = 2;   // 协议版本（用于兼容升级）
-  uint64 seq = 3;       // 序列号（发送端递增）
-  int64 sent_ts_ms = 4; // 发送时间戳（毫秒）
-  Detection detection = 5; // 检测结果结构
-  Gps gps = 6;          // GPS 数据结构
+  int64 sent_ts_ms = 1;                  // 发送时间戳（毫秒）
+  int64 source_ts_ms = 2;                // 检测输出时间戳（毫秒）
+  repeated DetectionObject detections = 3; // 多目标检测结果
+  Gps gps = 4;                           // GPS 数据结构
 }

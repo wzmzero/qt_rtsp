@@ -81,11 +81,11 @@ void TcpClientWorker::onReadyRead() {
     pkt.sentTsMs = msg.sent_ts_ms();
     pkt.rawJsonLine = QString::fromUtf8(payload.toHex(' '));
 
-    pkt.detection.label = QString::fromStdString(msg.detection().label());
-    pkt.detection.confidence = msg.detection().confidence();
-    pkt.detection.sourceTsMs = msg.detection().source_ts_ms();
+    pkt.detection.label = "multi";
+    pkt.detection.confidence = 0.0;
+    pkt.detection.sourceTsMs = msg.source_ts_ms();
 
-    for (const auto& o : msg.detection().objects()) {
+    for (const auto& o : msg.detections()) {
       demo::client::DetectionObject obj;
       obj.label = QString::fromStdString(o.label());
       obj.confidence = o.confidence();

@@ -38,20 +38,13 @@ struct Gps {
   std::uint8_t satellites_visible{10};
 };
 
-inline std::string to_protobuf_payload(const Detection& d, const Gps& g, std::int64_t sent_ts_ms,
-                                       std::uint64_t seq = 0, std::uint32_t version = 1) {
+inline std::string to_protobuf_payload(const Detection& d, const Gps& g, std::int64_t sent_ts_ms) {
   demo::msg::Telemetry msg;
-  msg.set_type("telemetry");
-  msg.set_version(version);
-  msg.set_seq(seq);
   msg.set_sent_ts_ms(sent_ts_ms);
 
-  auto* det = msg.mutable_detection();
-  det->set_label(d.label);
-  det->set_confidence(d.confidence);
-  det->set_source_ts_ms(d.source_ts_ms);
+  msg.set_source_ts_ms(d.source_ts_ms);
   for (const auto& o : d.objects) {
-    auto* out = det->add_objects();
+    auto* out = msg.add_detections();
     out->set_label_id(o.label_id);
     out->set_label(o.label);
     out->set_confidence(o.confidence);
@@ -78,9 +71,8 @@ inline std::string to_protobuf_payload(const Detection& d, const Gps& g, std::in
   return payload;
 }
 
-inline std::string to_protobuf_frame(const Detection& d, const Gps& g, std::int64_t sent_ts_ms,
-                                     std::uint64_t seq = 0, std::uint32_t version = 1) {
-  const std::string payload = to_protobuf_payload(d, g, sent_ts_ms, seq, version);
+inline std::string to_protobuf_frame(const Detection& d, const Gps& g, std::int64_t sent_ts_ms) {
+  const std::string payload = to_protobuf_payload(d, g, sent_ts_ms);
   const std::uint32_t n = static_cast<std::uint32_t>(payload.size());
   std::string frame;
   frame.resize(4 + payload.size());
