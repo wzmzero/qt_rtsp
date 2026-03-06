@@ -5,11 +5,16 @@
 #include "media/record_worker.h"
 
 #include <QApplication>
+#include <QByteArray>
 
 #include <iostream>
 #include <string>
 
 int main(int argc, char* argv[]) {
+  // 强制使用 FFmpeg 后端并放开 RTSP 协议白名单（解决部分环境下 RTSP 拉流失败）
+  qputenv("QT_MEDIA_BACKEND", QByteArray("ffmpeg"));
+  qputenv("QT_FFMPEG_PROTOCOL_WHITELIST", QByteArray("file,udp,rtp,tcp,rtsp"));
+
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
     if (arg == "-h" || arg == "--help") {
