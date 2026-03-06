@@ -128,8 +128,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   connect(tcp_, &demo::client::TcpClientWorker::logMessage, this, [this](const QString& msg) { appendLog("INFO", "tcp", msg); });
   connect(stream_, &demo::client::StreamWorker::logMessage, this, [this](const QString& msg) { appendLog("INFO", "stream", msg); });
   connect(recorder_, &demo::client::RecordWorker::logMessage, this, [this](const QString& msg) { appendLog("INFO", "record", msg); });
-  connect(recorder_, &demo::client::RecordWorker::playbackIndexed, db_,
-          &demo::client::SQLiteDatabaseService::insertPlaybackIndexAsync, Qt::QueuedConnection);
 
   tcpThread_.start();
   recordThread_.start();

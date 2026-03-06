@@ -120,7 +120,12 @@ bool SQLiteDatabaseService::initialize() {
 bool SQLiteDatabaseService::migrate() {
   QSqlQuery q(db_);
 
-  // --- core tables ---
+  // 清理历史表（按要求移除）
+  q.exec("DROP TABLE IF EXISTS schema_version;");
+  q.exec("DROP TABLE IF EXISTS playback_index;");
+  q.exec("DROP TABLE IF EXISTS telemetry_results;");
+  q.exec("DROP TABLE IF EXISTS gps_samples;");
+
   if (!q.exec("CREATE TABLE IF NOT EXISTS app_config("
               "id INTEGER PRIMARY KEY CHECK(id=1),"
               "rtsp_url TEXT NOT NULL, tcp_host TEXT NOT NULL, tcp_port INTEGER NOT NULL,"
@@ -140,7 +145,6 @@ bool SQLiteDatabaseService::migrate() {
     return false;
   }
 
-  // --- proto-aligned telemetry storage ---
   if (!q.exec("CREATE TABLE IF NOT EXISTS telemetry("
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
               "recv_ts_ms INTEGER NOT NULL,"
@@ -171,10 +175,12 @@ bool SQLiteDatabaseService::migrate() {
     return false;
   }
 
+  // 事件表重新建，明确外键指向 telemetry
+  q.exec("DROP TABLE IF EXISTS snapshot_events;");
   if (!q.exec("CREATE TABLE IF NOT EXISTS snapshot_events("
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
               "event_ts_ms INTEGER NOT NULL,"
-              "telemetry_id INTEGER,"
+              "telemetry_id INTEGER NOT NULL,"
               "screenshot_blob BLOB,"
               "reason_tag TEXT NOT NULL,"
               "label TEXT, confidence REAL, is_target_event INTEGER NOT NULL DEFAULT 0,"
@@ -183,18 +189,9 @@ bool SQLiteDatabaseService::migrate() {
     return false;
   }
 
-  // cleanup obsolete tables
-  q.exec("DROP TABLE IF EXISTS telemetry_results;");
-  q.exec("DROP TABLE IF EXISTS gps_samples;");
-  q.exec("DROP TABLE IF EXISTS playback_index;");
-  q.exec("DROP TABLE IF EXISTS schema_version;");
-
-  // cleanup obsolete columns
-  q.exec("ALTER TABLE snapshot_events DROP COLUMN screenshot_path;"); // ignored on old sqlite if unsupported
-
   q.exec("CREATE INDEX IF NOT EXISTS idx_logs_filter ON app_logs(level, type, ts_ms);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_telemetry_recv ON telemetry(recv_ts_ms);");
-  q.exec("CREATE INDEX IF NOT EXISTS idx_detection_tm ON detection_object(telemetry_id, obj_index);");
+  q.exec("CREATE INDEX IF NOT EXISTS idx_do_tm ON detection_object(telemetry_id, obj_index);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_gps_tm ON gps(telemetry_id);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_snapshot_filter ON snapshot_events(is_target_event, event_ts_ms, label);");
 
@@ -292,8 +289,8 @@ void SQLiteDatabaseService::insertAppLogAsync(qint64 tsMs, const QString& level,
   }
 }
 
-void SQLiteDatabaseService::insertPlaybackIndexAsync(const demo::client::PlaybackIndexRecord& rec) {
-  Q_UNUSED(rec);
+void SQLiteDatabaseService::insertPlaybackIndexAsync(const demo::client::PlaybackIndexRecord&) {
+  // playback_index 已移除
 }
 
 QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint64 fromMs, qint64 toMs,
