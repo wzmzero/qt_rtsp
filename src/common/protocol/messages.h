@@ -50,6 +50,8 @@ inline std::string to_json_line(const Detection& d, const Gps& g, std::int64_t s
     const auto& o = d.objects[i];
     if (i) oss << ",";
     oss << "{" << "\"label\":\"" << o.label << "\"," << "\"confidence\":" << o.confidence << ","
+        << "\"cx\":" << o.x << "," << "\"cy\":" << o.y << ","
+        << "\"w\":" << o.w << "," << "\"h\":" << o.h << ","
         << "\"bbox\":[" << o.x << "," << o.y << "," << o.w << "," << o.h << "]" << "}";
   }
   oss << "]},"

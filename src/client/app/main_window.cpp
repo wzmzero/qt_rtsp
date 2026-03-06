@@ -15,6 +15,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHeaderView>
@@ -34,6 +35,7 @@
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QStringList>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTimer>
@@ -51,12 +53,26 @@ double e7ToDegree(int e7) { return static_cast<double>(e7) / 10000000.0; }
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   projectRootDir_ = QDir::currentPath();
   const QString confDir = QDir(projectRootDir_).filePath("./conf");
+  const QString dbDir = QDir(projectRootDir_).filePath("./config");
   QDir().mkpath(confDir);
+  QDir().mkpath(dbDir);
   settings_ = new QSettings(QDir(confDir).filePath("client.ini"), QSettings::IniFormat, this);
   dataDir_ = resolvePath(settings_->value("storage/data_dir").toString(), "./data");
   logsDir_ = resolvePath(settings_->value("storage/logs_dir").toString(), "./logs");
   snapshotsDir_ = resolvePath(settings_->value("storage/snapshots_dir").toString(), "./snapshots");
-  dbPath_ = QDir(dataDir_).filePath("client_data.sqlite");
+  dbPath_ = QDir(dbDir).filePath("client_cfg.db");
+  dbDisplayPath_ = "./config/client_cfg.db";
+
+  const QString legacyDbPath = QDir(projectRootDir_).filePath("./data/client_data.sqlite");
+  if (!QFile::exists(dbPath_) && QFile::exists(legacyDbPath)) {
+    QDir().mkpath(QFileInfo(dbPath_).absolutePath());
+    if (QFile::copy(legacyDbPath, dbPath_)) {
+      qInfo() << "migrated legacy db:" << legacyDbPath << "->" << dbPath_;
+    } else {
+      qWarning() << "failed to migrate legacy db:" << legacyDbPath << "->" << dbPath_;
+    }
+  }
+
   logFilePath_ = QDir(logsDir_).filePath("qt_client.log");
   ensureRuntimeDirs();
 
@@ -109,8 +125,16 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   if (!config_.windowGeometry.isEmpty()) restoreGeometry(config_.windowGeometry);
   if (!config_.windowState.isEmpty()) restoreState(config_.windowState);
 
-  statusBar()->showMessage(QString("工程目录: %1 | 数据库: %2").arg(projectRootDir_, dbPath_));
-  appendLog("INFO", "app", "MainWindow initialized");
+  statusBar()->showMessage(QString("工程目录: %1 | DB: %2").arg(projectRootDir_, dbDisplayPath_));
+  appendLog("INFO", "app", QString("MainWindow initialized, DB display path=%1").arg(dbDisplayPath_));
+
+  if (qEnvironmentVariableIsSet("QT_CLIENT_AUTOTEST")) {
+    appendLog("INFO", "app", "AUTOTEST enabled: start->save->stop sequence");
+    QTimer::singleShot(400, this, &MainWindow::onStartAll);
+    QTimer::singleShot(2000, this, &MainWindow::onSaveConfig);
+    QTimer::singleShot(3400, this, &MainWindow::onStopAll);
+    QTimer::singleShot(4300, qApp, &QCoreApplication::quit);
+  }
 }
 
 MainWindow::~MainWindow() {
@@ -145,9 +169,10 @@ void MainWindow::setupMenus() {
   };
 
   auto* liveAction = addPageAction("实时模式", 0);
-  addPageAction("回放模式", 1);
-  addPageAction("日志查看", 2);
-  addPageAction("事件查看", 3);
+  addPageAction("数据视图", 1);
+  addPageAction("回放模式", 2);
+  addPageAction("日志查看", 3);
+  addPageAction("事件查看", 4);
   liveAction->setChecked(true);
 
   auto* liveMenu = menuBar()->addMenu("实时功能");
@@ -157,10 +182,9 @@ void MainWindow::setupMenus() {
   eventMenu->addAction("刷新事件", this, &MainWindow::onRefreshEvents);
 
   auto* helpMenu = menuBar()->addMenu("帮助");
-  helpMenu->addAction("关于", [this] {
-    QMessageBox::information(this, "关于", "Qt RTSP + TCP Client\nPhase1 可用版本");
-  });
+  helpMenu->addAction("关于", [this] { QMessageBox::information(this, "关于", "Qt RTSP + TCP Client\nPhase1 可用版本"); });
 }
+
 
 void MainWindow::setupUi() {
   setWindowTitle("Qt RTSP + TCP Client Demo");
@@ -173,7 +197,7 @@ void MainWindow::setupUi() {
 
   pages_ = new QStackedWidget(root);
 
-  // 实时页
+  // 实时页：视频 + 参数编辑
   auto* livePage = new QWidget(pages_);
   auto* liveLayout = new QHBoxLayout(livePage);
 
@@ -186,50 +210,7 @@ void MainWindow::setupUi() {
   connect(screenshotBtn_, &QPushButton::clicked, this, &MainWindow::onCaptureScreenshot);
   videoLayout->addWidget(screenshotBtn_, 0, Qt::AlignRight);
 
-  auto* side = new QWidget(livePage);
-  auto* sideLayout = new QVBoxLayout(side);
-
-  auto* statusBox = new QGroupBox("状态面板", side);
-  auto* statusLayout = new QVBoxLayout(statusBox);
-  connLight_ = new QLabel(statusBox);
-  connLight_->setFixedSize(14, 14);
-  connLight_->setStyleSheet("background:#ef4444;border-radius:7px;");
-  connState_ = new QLabel("连接状态: stopped", statusBox);
-  auto* lightRow = new QHBoxLayout();
-  lightRow->addWidget(new QLabel("连接灯:", statusBox));
-  lightRow->addWidget(connLight_);
-  lightRow->addStretch();
-  statusLayout->addLayout(lightRow);
-  statusLayout->addWidget(connState_);
-  auto* alertRow = new QHBoxLayout();
-  alertRow->addWidget(new QLabel("告警灯:", statusBox));
-  alertLight_ = new QLabel(statusBox);
-  alertLight_->setFixedSize(14, 14);
-  alertLight_->setStyleSheet("background:#334155;border-radius:7px;");
-  alertRow->addWidget(alertLight_);
-  alertRow->addStretch();
-  statusLayout->addLayout(alertRow);
-  alertStateLabel_ = new QLabel("组合告警: idle", statusBox);
-  statusLayout->addWidget(alertStateLabel_);
-
-  auto* rawGroup = new QGroupBox("未解析原始数据", statusBox);
-  auto* rawLayout = new QVBoxLayout(rawGroup);
-  tsLabel_ = new QLabel("时间戳: -", rawGroup);
-  gpsRawLabel_ = new QLabel("GPS(E7): -", rawGroup);
-  rawLayout->addWidget(tsLabel_);
-  rawLayout->addWidget(gpsRawLabel_);
-
-  auto* parsedGroup = new QGroupBox("解析结果", statusBox);
-  auto* parsedLayout = new QVBoxLayout(parsedGroup);
-  detectionLabel_ = new QLabel("检测结果: -", parsedGroup);
-  gpsParsedLabel_ = new QLabel("GPS(度): -", parsedGroup);
-  parsedLayout->addWidget(detectionLabel_);
-  parsedLayout->addWidget(gpsParsedLabel_);
-
-  statusLayout->addWidget(rawGroup);
-  statusLayout->addWidget(parsedGroup);
-
-  auto* cfgGroup = new QGroupBox("参数编辑区", side);
+  auto* cfgGroup = new QGroupBox("参数编辑区", livePage);
   auto* form = new QFormLayout(cfgGroup);
   rtspEdit_ = new QLineEdit(cfgGroup);
   tcpHostEdit_ = new QLineEdit(cfgGroup);
@@ -257,8 +238,8 @@ void MainWindow::setupUi() {
   auto* buttonRow = new QWidget(cfgGroup);
   auto* buttonLayout = new QHBoxLayout(buttonRow);
   buttonLayout->setContentsMargins(0, 0, 0, 0);
-  auto* startBtn = new QPushButton("启动全部", buttonRow);
-  auto* stopBtn = new QPushButton("停止全部", buttonRow);
+  auto* startBtn = new QPushButton("启动", buttonRow);
+  auto* stopBtn = new QPushButton("停止", buttonRow);
   auto* saveCfgBtn = new QPushButton("保存配置", buttonRow);
   buttonLayout->addWidget(startBtn);
   buttonLayout->addWidget(stopBtn);
@@ -276,13 +257,55 @@ void MainWindow::setupUi() {
   form->addRow("主题(保存后生效)", themeCombo_);
   form->addRow("控制", buttonRow);
 
-  sideLayout->addWidget(statusBox, 3);
-  sideLayout->addWidget(cfgGroup, 2);
-
-  liveLayout->addWidget(videoBox, 3);
-  liveLayout->addWidget(side, 2);
-
+  liveLayout->addWidget(videoBox, 4);
+  liveLayout->addWidget(cfgGroup, 2);
   pages_->addWidget(livePage);
+
+  // 数据视图页（菜单第二项）
+  auto* dataPage = new QWidget(pages_);
+  auto* dataLayout = new QVBoxLayout(dataPage);
+  auto* statusBox = new QGroupBox("状态面板", dataPage);
+  auto* statusLayout = new QVBoxLayout(statusBox);
+
+  auto* connRow = new QHBoxLayout();
+  connLight_ = new QLabel(statusBox);
+  connLight_->setFixedSize(14, 14);
+  connLight_->setStyleSheet("background:#ef4444;border-radius:7px;");
+  connState_ = new QLabel("stopped", statusBox);
+  connLineLabel_ = new QLabel("RTSP: - | TCP: -", statusBox);
+  connLineLabel_->setWordWrap(true);
+  connRow->addWidget(connLight_);
+  connRow->addWidget(connState_);
+  connRow->addWidget(new QLabel("|", statusBox));
+  connRow->addWidget(connLineLabel_, 1);
+  statusLayout->addLayout(connRow);
+
+  auto* alertRow = new QHBoxLayout();
+  alertRow->addWidget(new QLabel("告警灯:", statusBox));
+  alertLight_ = new QLabel(statusBox);
+  alertLight_->setFixedSize(14, 14);
+  alertLight_->setStyleSheet("background:#334155;border-radius:7px;");
+  alertRow->addWidget(alertLight_);
+  alertStateLabel_ = new QLabel("组合告警: idle", statusBox);
+  alertRow->addWidget(alertStateLabel_, 1);
+  statusLayout->addLayout(alertRow);
+
+  auto* rawGroup = new QGroupBox("接收数据", statusBox);
+  auto* rawLayout = new QVBoxLayout(rawGroup);
+  recvDataView_ = new QPlainTextEdit(rawGroup);
+  recvDataView_->setReadOnly(true);
+  rawLayout->addWidget(recvDataView_);
+
+  auto* parsedGroup = new QGroupBox("解析结果", statusBox);
+  auto* parsedLayout = new QVBoxLayout(parsedGroup);
+  parsedResultView_ = new QPlainTextEdit(parsedGroup);
+  parsedResultView_->setReadOnly(true);
+  parsedLayout->addWidget(parsedResultView_);
+
+  statusLayout->addWidget(rawGroup, 3);
+  statusLayout->addWidget(parsedGroup, 3);
+  dataLayout->addWidget(statusBox, 1);
+  pages_->addWidget(dataPage);
 
   auto* playbackPage = new QWidget(pages_);
   auto* pbLayout = new QVBoxLayout(playbackPage);
@@ -349,6 +372,7 @@ void MainWindow::setupUi() {
   connect(connBlinkTimer_, &QTimer::timeout, this, &MainWindow::blinkConnectionIndicator);
 }
 
+
 void MainWindow::onStartAll() {
   config_ = collectConfigFromUi();
   settings_->setValue("storage/data_dir", toStoredRelativePath(dataDir_));
@@ -363,7 +387,8 @@ void MainWindow::onStartAll() {
   QMetaObject::invokeMethod(stream_, "start", Qt::QueuedConnection, Q_ARG(QUrl, QUrl(config_.rtspUrl)));
   if (config_.recordEnabled) QMetaObject::invokeMethod(recorder_, "start", Qt::QueuedConnection, Q_ARG(QString, runtimeRecordDir));
 
-  statusBar()->showMessage(QString("运行中 | DB: %1").arg(dbPath_));
+  statusBar()->showMessage(QString("运行中 | DB: %1").arg(dbDisplayPath_));
+  appendLog("INFO", "app", QString("StatusBar => 运行中 | DB: %1").arg(dbDisplayPath_));
   appendLog("INFO", "app", "Workers started");
 }
 
@@ -371,7 +396,8 @@ void MainWindow::onStopAll() {
   QMetaObject::invokeMethod(tcp_, "stop", Qt::QueuedConnection);
   QMetaObject::invokeMethod(stream_, "stop", Qt::QueuedConnection);
   QMetaObject::invokeMethod(recorder_, "stop", Qt::QueuedConnection);
-  statusBar()->showMessage(QString("已停止 | DB: %1").arg(dbPath_));
+  statusBar()->showMessage(QString("已停止 | DB: %1").arg(dbDisplayPath_));
+  appendLog("INFO", "app", QString("StatusBar => 已停止 | DB: %1").arg(dbDisplayPath_));
   appendLog("INFO", "app", "Workers stopped");
 }
 
@@ -386,28 +412,68 @@ void MainWindow::onSaveConfig() {
   repo_->saveConfig(config_);
   applyTheme(config_.theme);
   appendLog("INFO", "app", "Config saved to QSettings + SQLite");
-  QMessageBox::information(this, "保存成功", "配置已保存，主题已应用。");
+  if (!qEnvironmentVariableIsSet("QT_CLIENT_AUTOTEST")) {
+    QMessageBox::information(this, "保存成功", "配置已保存，主题已应用。");
+  }
 }
 
 void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
   lastPkt_ = pkt;
-  tsLabel_->setText(QString("时间戳: source=%1 sent=%2 recv=%3").arg(pkt.detection.sourceTsMs).arg(pkt.sentTsMs).arg(pkt.recvTsMs));
-  detectionLabel_->setText(QString("检测结果: %1 (%.2f), objects=%3")
-                               .arg(pkt.detection.label)
-                               .arg(pkt.detection.confidence, 0, 'f', 2)
-                               .arg(pkt.detection.objects.size()));
-  gpsRawLabel_->setText(QString("GPS(E7): lat=%1 lon=%2 alt_mm=%3 sat=%4")
-                            .arg(pkt.gps.latE7)
-                            .arg(pkt.gps.lonE7)
-                            .arg(pkt.gps.altMm)
-                            .arg(pkt.gps.satellitesVisible));
-  gpsParsedLabel_->setText(QString("GPS(度): lat=%1 lon=%2")
-                               .arg(e7ToDegree(pkt.gps.latE7), 0, 'f', 7)
-                               .arg(e7ToDegree(pkt.gps.lonE7), 0, 'f', 7));
+
+  const QString rawObjects = [&pkt]() {
+    QStringList lines;
+    int i = 0;
+    for (const auto& o : pkt.detection.objects) {
+      lines << QString("  [%1] %2 conf=%3 bbox(cx=%4,cy=%5,w=%6,h=%7)")
+                   .arg(i++)
+                   .arg(o.label)
+                   .arg(o.confidence, 0, 'f', 2)
+                   .arg(o.bbox.x(), 0, 'f', 3)
+                   .arg(o.bbox.y(), 0, 'f', 3)
+                   .arg(o.bbox.width(), 0, 'f', 3)
+                   .arg(o.bbox.height(), 0, 'f', 3);
+    }
+    return lines.join("\n");
+  }();
+
+  if (recvDataView_) {
+    recvDataView_->setPlainText(QString("raw_json: %1\n"
+                                        "timestamps(ms): source=%2 sent=%3 recv=%4\n"
+                                        "gps_raw(E7): lat=%5 lon=%6 alt_mm=%7 sat=%8\n"
+                                        "objects(%9):\n%10")
+                                    .arg(pkt.rawJsonLine)
+                                    .arg(pkt.detection.sourceTsMs)
+                                    .arg(pkt.sentTsMs)
+                                    .arg(pkt.recvTsMs)
+                                    .arg(pkt.gps.latE7)
+                                    .arg(pkt.gps.lonE7)
+                                    .arg(pkt.gps.altMm)
+                                    .arg(pkt.gps.satellitesVisible)
+                                    .arg(pkt.detection.objects.size())
+                                    .arg(rawObjects));
+  }
 
   evaluatePersonRodAlert(pkt);
+
+  const QString parsed = QString("是否报警: %1\n"
+                                 "当前无人机坐标: lat=%2 (%3) lon=%4 (%5)\n"
+                                 "关键检测摘要: label=%6 conf=%7 objects=%8")
+                             .arg(alertActive_ ? "是" : "否")
+                             .arg(pkt.gps.latE7)
+                             .arg(e7ToDegree(pkt.gps.latE7), 0, 'f', 7)
+                             .arg(pkt.gps.lonE7)
+                             .arg(e7ToDegree(pkt.gps.lonE7), 0, 'f', 7)
+                             .arg(pkt.detection.label)
+                             .arg(pkt.detection.confidence, 0, 'f', 2)
+                             .arg(pkt.detection.objects.size());
+  if (parsedResultView_) parsedResultView_->setPlainText(parsed);
+
+  if (parsedResultView_) {
+    parsedResultView_->appendPlainText(QString("\nIoU阈值: %1").arg(alertIouThreshold_, 0, 'f', 2));
+  }
   repo_->appendTelemetry(pkt);
 }
+
 
 void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
   if (videoWidget_ && videoWidget_->videoSink()) {
@@ -424,7 +490,11 @@ void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
 
 void MainWindow::onConnectionStateChanged(const QString& state) {
   connStateValue_ = state;
-  connState_->setText("连接状态: " + state);
+  if (connState_) connState_->setText(QString("连接状态: %1").arg(state));
+  if (connLineLabel_) {
+    connLineLabel_->setText(QString("RTSP: %1 | TCP: %2:%3").arg(config_.rtspUrl, config_.tcpHost).arg(config_.tcpPort));
+  }
+
   const bool active = state.contains("connected", Qt::CaseInsensitive) || state.contains("running", Qt::CaseInsensitive);
   if (active) {
     connBlinkTimer_->start();
@@ -433,6 +503,7 @@ void MainWindow::onConnectionStateChanged(const QString& state) {
     connLight_->setStyleSheet("background:#ef4444;border-radius:7px;");
   }
 }
+
 
 void MainWindow::blinkConnectionIndicator() {
   connBlinkOn_ = !connBlinkOn_;

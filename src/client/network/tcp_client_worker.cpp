@@ -69,6 +69,7 @@ void TcpClientWorker::onReadyRead() {
     TelemetryPacket pkt;
     pkt.recvTsMs = QDateTime::currentMSecsSinceEpoch();
     pkt.sentTsMs = static_cast<qint64>(root.value("sent_ts_ms").toDouble());
+    pkt.rawJsonLine = QString::fromUtf8(line);
 
     const auto det = root.value("detection").toObject();
     pkt.detection.label = det.value("label").toString();
@@ -82,7 +83,10 @@ void TcpClientWorker::onReadyRead() {
         demo::client::DetectionObject obj;
         obj.label = o.value("label").toString();
         obj.confidence = o.value("confidence").toDouble();
-        if (o.contains("bbox") && o.value("bbox").isArray()) {
+        if (o.contains("cx") && o.contains("cy") && o.contains("w") && o.contains("h")) {
+          obj.bbox = QRectF(o.value("cx").toDouble(), o.value("cy").toDouble(),
+                            o.value("w").toDouble(), o.value("h").toDouble());
+        } else if (o.contains("bbox") && o.value("bbox").isArray()) {
           const auto b = o.value("bbox").toArray();
           if (b.size() >= 4) {
             obj.bbox = QRectF(b.at(0).toDouble(), b.at(1).toDouble(), b.at(2).toDouble(), b.at(3).toDouble());

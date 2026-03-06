@@ -34,6 +34,7 @@ struct GpsMsg {
 struct TelemetryPacket {
   qint64 recvTsMs{0};
   qint64 sentTsMs{0};
+  QString rawJsonLine;
   DetectionMsg detection;
   GpsMsg gps;
 };

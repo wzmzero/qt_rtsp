@@ -76,13 +76,12 @@ private:
   QStackedWidget* pages_{nullptr};
 
   QLabel* connState_{nullptr};
+  QLabel* connLineLabel_{nullptr};
   QLabel* connLight_{nullptr};
   QLabel* alertLight_{nullptr};
-  QLabel* tsLabel_{nullptr};
-  QLabel* detectionLabel_{nullptr};
-  QLabel* gpsRawLabel_{nullptr};
-  QLabel* gpsParsedLabel_{nullptr};
   QLabel* alertStateLabel_{nullptr};
+  QPlainTextEdit* recvDataView_{nullptr};
+  QPlainTextEdit* parsedResultView_{nullptr};
 
   QLineEdit* rtspEdit_{nullptr};
   QLineEdit* tcpHostEdit_{nullptr};
@@ -128,6 +127,7 @@ private:
   QString logsDir_;
   QString snapshotsDir_;
   QString dbPath_;
+  QString dbDisplayPath_;
   QString logFilePath_;
   bool alertActive_{false};
   double alertIouThreshold_{0.10};

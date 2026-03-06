@@ -91,16 +91,27 @@ int TcpSimServer::run() {
         const auto now_ms = demo::core::now_ms();
 
         demo::protocol::Detection d;
-        d.label = (seq % 3 == 0) ? "person" : ((seq % 3 == 1) ? "boat" : "none");
+        d.label = (seq % 4 == 0) ? "person" : ((seq % 4 == 1) ? "rod" : ((seq % 4 == 2) ? "boat" : "none"));
         d.confidence = conf(rng);
         d.source_ts_ms = now_ms - 15;
 
-        demo::protocol::DetectionObject person{"person", conf(rng), 0.20 + (seq % 10) * 0.01, 0.20, 0.32, 0.46};
-        demo::protocol::DetectionObject rod{"rod", conf(rng), 0.28 + ((seq + 2) % 10) * 0.01, 0.34, 0.30, 0.12};
-        demo::protocol::DetectionObject boat{"boat", conf(rng), 0.60, 0.32, 0.30, 0.24};
+        // YOLO normalized bbox: cx,cy,w,h in [0,1]
+        const bool closePair = (seq % 3 != 0);
+        const double personCx = 0.28 + (seq % 8) * 0.02;
+        const double personCy = 0.36;
+        const double personW = 0.30;
+        const double personH = 0.44;
+        const double rodCx = closePair ? (personCx + 0.01) : (personCx + 0.28);
+        const double rodCy = closePair ? (personCy + 0.01) : (personCy + 0.20);
+
+        demo::protocol::DetectionObject person{"person", conf(rng), personCx, personCy, personW, personH};
+        demo::protocol::DetectionObject rod{"rod", conf(rng), rodCx, rodCy, 0.28, 0.13};
+        demo::protocol::DetectionObject boat{"boat", conf(rng), 0.70, 0.42, 0.26, 0.20};
+        demo::protocol::DetectionObject buoy{"buoy", conf(rng), 0.12 + (seq % 5) * 0.03, 0.70, 0.08, 0.10};
         d.objects.push_back(person);
-        if (seq % 2 == 0) d.objects.push_back(rod);
+        d.objects.push_back(rod);
         d.objects.push_back(boat);
+        if (seq % 2 == 0) d.objects.push_back(buoy);
 
         demo::protocol::Gps g;
         g.time_usec = static_cast<std::int64_t>(now_ms) * 1000;

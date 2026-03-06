@@ -185,3 +185,66 @@ lsof -iTCP:8554 -nP | grep ESTABLISHED
 - `src/server/media/rtsp_launcher.cpp`
 - `README.md`
 - `PROGRESS.md`
+
+
+## 2026-03-06（重点改造：数据视图页 + 多目标YOLO + 相对DB路径）
+
+### 完成项
+1. **状态面板重构 + 菜单第二项改造**
+   - 新增“数据视图”页面（菜单第二项），将状态面板从参数编辑区解耦。
+   - “未解析原始数据”更名为“接收数据”，并展示完整接收内容：raw json、source/sent/recv 时间戳、GPS(E7)、多目标列表。
+   - “解析结果”展示：是否报警、当前无人机坐标（E7+度）、关键检测摘要。
+   - 连接信息精简为一行：`连接灯 + 连接状态 + RTSP/TCP 链接信息`。
+
+2. **参数编辑区按钮约束**
+   - 控制按钮仅保留：`启动`、`停止`、`保存配置`。
+
+3. **格式化错误修复**
+   - 修复 `(% .2f)` 风格占位符未替换问题（已统一为 Qt 正确 `.arg(..., 'f', 2)` 输出）。
+
+4. **协议升级：sim_server 多目标 + YOLO坐标**
+   - 推送对象字段升级为：`label, confidence, cx, cy, w, h`（归一化）
+   - 保留 `bbox` 数组以兼容旧解析。
+   - 含时间戳字段：`source_ts_ms`, `sent_ts_ms`。
+
+5. **客户端算法升级：person/rod IoU 告警**
+   - 解析多目标对象列表，按 IoU 阈值触发告警灯/文本与日志记录。
+
+6. **DB路径切换与旧库兼容迁移**
+   - 默认数据库改为：`./config/client_cfg.db`。
+   - 状态栏展示改为相对路径：`运行中 | DB: ./config/client_cfg.db`。
+   - 启动时若检测到旧库 `./data/client_data.sqlite` 且新库不存在，自动一次性迁移复制。
+
+### 测试步骤
+```bash
+cmake -S . -B build
+cmake --build build -j4
+
+./build/src/server/sim_server
+QT_QPA_PLATFORM=offscreen QT_CLIENT_AUTOTEST=1 ./build/src/client/qt_client
+```
+
+### 测试结果（证据摘要）
+- 编译通过：`cmake --build build -j4` ✅
+- 自动流程触发了 启动/保存/停止：
+  - `AUTOTEST enabled: start->save->stop sequence`
+  - `Workers started` / `Config saved` / `Workers stopped`
+- 告警逻辑命中：
+  - `person+rod告警触发, IoU=0.28, objects=[...]`
+- 状态栏相对路径显示已生效：
+  - `StatusBar => 运行中 | DB: ./config/client_cfg.db`
+  - `StatusBar => 已停止 | DB: ./config/client_cfg.db`
+- 默认DB落盘路径确认：`./config/client_cfg.db` ✅
+
+### 本轮主要变更文件
+- `src/common/protocol/messages.h`
+- `src/server/network/tcp_sim_server.cpp`
+- `src/client/core/types.h`
+- `src/client/network/tcp_client_worker.cpp`
+- `src/client/app/main_window.h`
+- `src/client/app/main_window.cpp`
+- `README.md`
+- `PROGRESS.md`
+
+### 已知限制
+- 无头环境下通过 `QT_CLIENT_AUTOTEST` 验证按钮行为（等效调用槽函数）；若需严格“鼠标点击级”验证，建议在桌面环境补充手工回归。
