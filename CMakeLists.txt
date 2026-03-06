@@ -9,8 +9,13 @@ set(CMAKE_AUTOUIC ON)
 
 option(BUILD_CLIENT "Build Qt client" ON)
 option(BUILD_SERVER "Build std:: server" ON)
+option(BUILD_MEDIA_CORE "Build standalone media core/test" ON)
 
 add_subdirectory(src/common)
+
+if(BUILD_MEDIA_CORE)
+  add_subdirectory(src/media_core)
+endif()
 
 if(BUILD_SERVER)
   add_subdirectory(src/server)
