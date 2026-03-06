@@ -120,36 +120,7 @@ bool SQLiteDatabaseService::initialize() {
 bool SQLiteDatabaseService::migrate() {
   QSqlQuery q(db_);
 
-  if (!q.exec("CREATE TABLE IF NOT EXISTS schema_version(version INTEGER NOT NULL);")) {
-    qWarning() << "Create schema_version bootstrap failed:" << q.lastError().text();
-    return false;
-  }
-
-  int version = 0;
-  if (q.exec("SELECT MAX(version) FROM schema_version;") && q.next() && !q.value(0).isNull()) {
-    version = q.value(0).toInt();
-  }
-
-  // normalize schema_version to (version, applied_at_ms)
-  int schemaVersionCols = 0;
-  if (q.exec("PRAGMA table_info(schema_version);") ) {
-    while (q.next()) ++schemaVersionCols;
-  }
-  if (schemaVersionCols < 2) {
-    q.exec("DROP TABLE IF EXISTS schema_version;");
-    if (!q.exec("CREATE TABLE schema_version(version INTEGER NOT NULL, applied_at_ms INTEGER NOT NULL);")) {
-      qWarning() << "Create schema_version normalized failed:" << q.lastError().text();
-      return false;
-    }
-    if (!q.exec(QString("INSERT INTO schema_version(version,applied_at_ms) VALUES(%1,%2);")
-                    .arg(version)
-                    .arg(QDateTime::currentMSecsSinceEpoch()))) {
-      qWarning() << "Seed schema_version failed:" << q.lastError().text();
-      return false;
-    }
-  }
-
-  // v3 functional schema
+  // --- core tables ---
   if (!q.exec("CREATE TABLE IF NOT EXISTS app_config("
               "id INTEGER PRIMARY KEY CHECK(id=1),"
               "rtsp_url TEXT NOT NULL, tcp_host TEXT NOT NULL, tcp_port INTEGER NOT NULL,"
@@ -159,42 +130,22 @@ bool SQLiteDatabaseService::migrate() {
     return false;
   }
 
-  if (!q.exec("CREATE TABLE IF NOT EXISTS telemetry_results("
+  if (!q.exec("CREATE TABLE IF NOT EXISTS app_logs("
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-              "recv_ts_ms INTEGER NOT NULL, sent_ts_ms INTEGER NOT NULL, source_ts_ms INTEGER NOT NULL,"
-              "label TEXT, confidence REAL, detection_objects_json TEXT);")) {
-    qWarning() << "Create telemetry_results failed:" << q.lastError().text();
+              "ts_ms INTEGER NOT NULL,"
+              "level TEXT NOT NULL,"
+              "type TEXT NOT NULL,"
+              "message TEXT NOT NULL);")) {
+    qWarning() << "Create app_logs failed:" << q.lastError().text();
     return false;
   }
 
-  if (!q.exec("CREATE TABLE IF NOT EXISTS gps_samples("
-              "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-              "telemetry_id INTEGER,"
-              "sample_ts_ms INTEGER NOT NULL,"
-              "time_usec INTEGER, lat_e7 INTEGER, lon_e7 INTEGER, alt_mm INTEGER,"
-              "vel_cms INTEGER, cog_cdeg INTEGER, fix_type INTEGER, satellites_visible INTEGER,"
-              "lat_deg REAL, lon_deg REAL,"
-              "FOREIGN KEY(telemetry_id) REFERENCES telemetry_results(id));")) {
-    qWarning() << "Create gps_samples failed:" << q.lastError().text();
-    return false;
-  }
-
-  if (!q.exec("CREATE TABLE IF NOT EXISTS snapshot_events("
-              "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-              "event_ts_ms INTEGER NOT NULL,"
-              "telemetry_id INTEGER,"
-              "screenshot_path TEXT,"
-              "screenshot_blob BLOB,"
-              "reason_tag TEXT NOT NULL,"
-              "label TEXT, confidence REAL, is_target_event INTEGER NOT NULL DEFAULT 0,"
-              "FOREIGN KEY(telemetry_id) REFERENCES telemetry_results(id));")) {
-    qWarning() << "Create snapshot_events failed:" << q.lastError().text();
-    return false;
-  }
-
+  // --- proto-aligned telemetry storage ---
   if (!q.exec("CREATE TABLE IF NOT EXISTS telemetry("
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-              "recv_ts_ms INTEGER NOT NULL, sent_ts_ms INTEGER NOT NULL, source_ts_ms INTEGER NOT NULL);")) {
+              "recv_ts_ms INTEGER NOT NULL,"
+              "sent_ts_ms INTEGER NOT NULL,"
+              "source_ts_ms INTEGER NOT NULL);")) {
     qWarning() << "Create telemetry failed:" << q.lastError().text();
     return false;
   }
@@ -220,128 +171,36 @@ bool SQLiteDatabaseService::migrate() {
     return false;
   }
 
-  if (!q.exec("CREATE TABLE IF NOT EXISTS app_logs("
+  if (!q.exec("CREATE TABLE IF NOT EXISTS snapshot_events("
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-              "ts_ms INTEGER NOT NULL,"
-              "level TEXT NOT NULL,"
-              "type TEXT NOT NULL,"
-              "message TEXT NOT NULL);")) {
-    qWarning() << "Create app_logs failed:" << q.lastError().text();
+              "event_ts_ms INTEGER NOT NULL,"
+              "telemetry_id INTEGER,"
+              "screenshot_blob BLOB,"
+              "reason_tag TEXT NOT NULL,"
+              "label TEXT, confidence REAL, is_target_event INTEGER NOT NULL DEFAULT 0,"
+              "FOREIGN KEY(telemetry_id) REFERENCES telemetry(id));")) {
+    qWarning() << "Create snapshot_events failed:" << q.lastError().text();
     return false;
   }
 
-  if (!q.exec("CREATE TABLE IF NOT EXISTS playback_index("
-              "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-              "frame_ts_ms INTEGER NOT NULL,"
-              "wall_ts_ms INTEGER NOT NULL,"
-              "meta_path TEXT NOT NULL,"
-              "latency_ms INTEGER NOT NULL,"
-              "label TEXT, confidence REAL, lat_deg REAL DEFAULT 0, lon_deg REAL DEFAULT 0);")) {
-    qWarning() << "Create playback_index failed:" << q.lastError().text();
-    return false;
-  }
+  // cleanup obsolete tables
+  q.exec("DROP TABLE IF EXISTS telemetry_results;");
+  q.exec("DROP TABLE IF EXISTS gps_samples;");
+  q.exec("DROP TABLE IF EXISTS playback_index;");
+  q.exec("DROP TABLE IF EXISTS schema_version;");
 
-  q.exec("CREATE INDEX IF NOT EXISTS idx_telemetry_ts ON telemetry_results(recv_ts_ms);");
-  q.exec("CREATE INDEX IF NOT EXISTS idx_gps_telemetry ON gps_samples(telemetry_id);");
-  q.exec("CREATE INDEX IF NOT EXISTS idx_snapshot_filter ON snapshot_events(is_target_event, event_ts_ms, label);");
+  // cleanup obsolete columns
+  q.exec("ALTER TABLE snapshot_events DROP COLUMN screenshot_path;"); // ignored on old sqlite if unsupported
+
   q.exec("CREATE INDEX IF NOT EXISTS idx_logs_filter ON app_logs(level, type, ts_ms);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_telemetry_recv ON telemetry(recv_ts_ms);");
-  q.exec("CREATE INDEX IF NOT EXISTS idx_do_tm ON detection_object(telemetry_id, obj_index);");
+  q.exec("CREATE INDEX IF NOT EXISTS idx_detection_tm ON detection_object(telemetry_id, obj_index);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_gps_tm ON gps(telemetry_id);");
-
-  if (version < 3) {
-    const bool hasLegacy = q.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='telemetry_objects';") && q.next();
-    if (hasLegacy) {
-      q.exec("INSERT INTO telemetry_results(recv_ts_ms,sent_ts_ms,source_ts_ms,label,confidence) "
-             "SELECT recv_ts_ms,sent_ts_ms,source_ts_ms,label,confidence FROM telemetry_objects;");
-
-      q.exec("INSERT INTO gps_samples(telemetry_id,sample_ts_ms,time_usec,lat_e7,lon_e7,alt_mm,vel_cms,cog_cdeg,fix_type,satellites_visible,lat_deg,lon_deg) "
-             "SELECT tr.id,tobj.recv_ts_ms,tobj.gps_time_usec,tobj.gps_lat_e7,tobj.gps_lon_e7,tobj.gps_alt_mm,tobj.gps_vel_cms,tobj.gps_cog_cdeg,tobj.gps_fix_type,tobj.gps_satellites_visible,"
-             "(CAST(tobj.gps_lat_e7 AS REAL)/10000000.0),(CAST(tobj.gps_lon_e7 AS REAL)/10000000.0) "
-             "FROM telemetry_objects tobj "
-             "LEFT JOIN telemetry_results tr ON tr.recv_ts_ms=tobj.recv_ts_ms AND tr.sent_ts_ms=tobj.sent_ts_ms AND tr.source_ts_ms=tobj.source_ts_ms "
-             "AND IFNULL(tr.label,'')=IFNULL(tobj.label,'') LIMIT -1;");
-
-      q.exec("INSERT INTO snapshot_events(event_ts_ms,telemetry_id,screenshot_path,reason_tag,label,confidence,is_target_event) "
-             "SELECT tobj.recv_ts_ms,tr.id,tobj.screenshot_path,'legacy',tobj.label,tobj.confidence,tobj.is_target_event "
-             "FROM telemetry_objects tobj "
-             "LEFT JOIN telemetry_results tr ON tr.recv_ts_ms=tobj.recv_ts_ms AND tr.sent_ts_ms=tobj.sent_ts_ms AND tr.source_ts_ms=tobj.source_ts_ms "
-             "AND IFNULL(tr.label,'')=IFNULL(tobj.label,'') "
-             "WHERE tobj.screenshot_path IS NOT NULL AND tobj.screenshot_path != '';");
-
-      q.exec("DROP TABLE IF EXISTS telemetry_objects;");
-    }
-
-    q.exec("DELETE FROM schema_version;");
-    if (!q.exec(QString("INSERT INTO schema_version(version,applied_at_ms) VALUES(3,%1);")
-                    .arg(QDateTime::currentMSecsSinceEpoch()))) {
-      qWarning() << "Update schema_version to v3 failed:" << q.lastError().text();
-      return false;
-    }
-  }
-
-  // ensure v4 columns exist
-  bool hasDetObjCol = false;
-  if (q.exec("PRAGMA table_info(telemetry_results);") ) {
-    while (q.next()) {
-      if (q.value(1).toString() == "detection_objects_json") {
-        hasDetObjCol = true;
-        break;
-      }
-    }
-  }
-  if (!hasDetObjCol) {
-    q.exec("ALTER TABLE telemetry_results ADD COLUMN detection_objects_json TEXT;");
-  }
-
-  bool hasPlaybackLat = false;
-  bool hasPlaybackLon = false;
-  if (q.exec("PRAGMA table_info(playback_index);") ) {
-    while (q.next()) {
-      const auto c = q.value(1).toString();
-      if (c == "lat_deg") hasPlaybackLat = true;
-      if (c == "lon_deg") hasPlaybackLon = true;
-    }
-  }
-  if (!hasPlaybackLat) q.exec("ALTER TABLE playback_index ADD COLUMN lat_deg REAL DEFAULT 0;");
-  if (!hasPlaybackLon) q.exec("ALTER TABLE playback_index ADD COLUMN lon_deg REAL DEFAULT 0;");
-
-  if (version < 4) {
-    q.exec("DELETE FROM schema_version;");
-    if (!q.exec(QString("INSERT INTO schema_version(version,applied_at_ms) VALUES(4,%1);")
-                    .arg(QDateTime::currentMSecsSinceEpoch()))) {
-      qWarning() << "Update schema_version to v4 failed:" << q.lastError().text();
-      return false;
-    }
-  }
-
-  bool hasSnapshotBlobCol = false;
-  if (q.exec("PRAGMA table_info(snapshot_events);") ) {
-    while (q.next()) {
-      if (q.value(1).toString() == "screenshot_blob") {
-        hasSnapshotBlobCol = true;
-        break;
-      }
-    }
-  }
-  if (!hasSnapshotBlobCol) {
-    q.exec("ALTER TABLE snapshot_events ADD COLUMN screenshot_blob BLOB;");
-  }
-
-  bool hasEph = false;
-  bool hasEpv = false;
-  if (q.exec("PRAGMA table_info(gps);") ) {
-    while (q.next()) {
-      const auto c = q.value(1).toString();
-      if (c == "eph_cm") hasEph = true;
-      if (c == "epv_cm") hasEpv = true;
-    }
-  }
-  if (!hasEph) q.exec("ALTER TABLE gps ADD COLUMN eph_cm INTEGER DEFAULT 0;");
-  if (!hasEpv) q.exec("ALTER TABLE gps ADD COLUMN epv_cm INTEGER DEFAULT 0;");
+  q.exec("CREATE INDEX IF NOT EXISTS idx_snapshot_filter ON snapshot_events(is_target_event, event_ts_ms, label);");
 
   return true;
 }
+
 
 AppConfig SQLiteDatabaseService::loadConfig() {
   AppConfig cfg;
@@ -404,11 +263,10 @@ void SQLiteDatabaseService::insertSnapshotEventAsync(const demo::client::Telemet
   if (telemetryId <= 0) return;
 
   QSqlQuery q(db_);
-  q.prepare("INSERT INTO snapshot_events(event_ts_ms,telemetry_id,screenshot_path,screenshot_blob,reason_tag,label,confidence,is_target_event) "
-            "VALUES(?,?,?,?,?,?,?,?);");
+  q.prepare("INSERT INTO snapshot_events(event_ts_ms,telemetry_id,screenshot_blob,reason_tag,label,confidence,is_target_event) "
+            "VALUES(?,?,?,?,?,?,?);");
   q.addBindValue(pkt.recvTsMs > 0 ? pkt.recvTsMs : QDateTime::currentMSecsSinceEpoch());
   q.addBindValue(telemetryId);
-  q.addBindValue(QString());
   q.addBindValue(screenshotBlob);
   q.addBindValue(reasonTag);
   q.addBindValue(pkt.detection.label);
@@ -435,20 +293,7 @@ void SQLiteDatabaseService::insertAppLogAsync(qint64 tsMs, const QString& level,
 }
 
 void SQLiteDatabaseService::insertPlaybackIndexAsync(const demo::client::PlaybackIndexRecord& rec) {
-  if (!ensureConnection()) return;
-  QSqlQuery q(db_);
-  q.prepare("INSERT INTO playback_index(frame_ts_ms,wall_ts_ms,meta_path,latency_ms,label,confidence,lat_deg,lon_deg) VALUES(?,?,?,?,?,?,?,?);");
-  q.addBindValue(rec.frameTsMs);
-  q.addBindValue(rec.wallTsMs);
-  q.addBindValue(rec.metaPath);
-  q.addBindValue(rec.latencyMs);
-  q.addBindValue(rec.label);
-  q.addBindValue(rec.confidence);
-  q.addBindValue(rec.latDeg);
-  q.addBindValue(rec.lonDeg);
-  if (!q.exec()) {
-    qWarning() << "Insert playback_index failed:" << q.lastError().text();
-  }
+  Q_UNUSED(rec);
 }
 
 QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint64 fromMs, qint64 toMs,
@@ -456,7 +301,7 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
   QList<EventRecord> items;
   if (!ensureConnection()) return items;
 
-  QString sql = "SELECT se.event_ts_ms, se.screenshot_path, se.screenshot_blob, se.label, se.confidence, se.is_target_event, "
+  QString sql = "SELECT se.event_ts_ms, se.screenshot_blob, se.label, se.confidence, se.is_target_event, "
                 "IFNULL(CAST(gm.lat_e7 AS REAL)/10000000.0,0), IFNULL(CAST(gm.lon_e7 AS REAL)/10000000.0,0), "
                 "IFNULL((SELECT GROUP_CONCAT(printf('%s:[%.2f,%.2f,%.2f,%.2f]', do.label, do.cx, do.cy, do.w, do.h), ' | ') "
                 "        FROM detection_object do WHERE do.telemetry_id = se.telemetry_id ORDER BY do.obj_index LIMIT 2), '') "
@@ -484,14 +329,14 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
   while (q.next()) {
     EventRecord r;
     r.tsMs = q.value(0).toLongLong();
-    r.screenshotPath = q.value(1).toString();
-    r.screenshotBlob = q.value(2).toByteArray();
-    r.label = q.value(3).toString();
-    r.confidence = q.value(4).toDouble();
-    r.isTargetEvent = q.value(5).toInt() != 0;
-    r.latDeg = q.value(6).toDouble();
-    r.lonDeg = q.value(7).toDouble();
-    r.bboxSummary = q.value(8).toString();
+    r.screenshotPath.clear();
+    r.screenshotBlob = q.value(1).toByteArray();
+    r.label = q.value(2).toString();
+    r.confidence = q.value(3).toDouble();
+    r.isTargetEvent = q.value(4).toInt() != 0;
+    r.latDeg = q.value(5).toDouble();
+    r.lonDeg = q.value(6).toDouble();
+    r.bboxSummary = q.value(7).toString();
     items.push_back(r);
   }
   return items;
@@ -499,30 +344,9 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
 
 
 QList<PlaybackIndexRecord> SQLiteDatabaseService::queryPlaybackIndex(int limit) {
-  QList<PlaybackIndexRecord> items;
-  if (!ensureConnection()) return items;
-
-  QSqlQuery q(db_);
-  q.prepare("SELECT frame_ts_ms,wall_ts_ms,meta_path,latency_ms,label,confidence,IFNULL(lat_deg,0),IFNULL(lon_deg,0) "
-            "FROM playback_index ORDER BY frame_ts_ms DESC LIMIT ?;");
-  q.addBindValue(limit);
-  if (!q.exec()) {
-    qWarning() << "Query playback_index failed:" << q.lastError().text();
-    return items;
-  }
-  while (q.next()) {
-    PlaybackIndexRecord r;
-    r.frameTsMs = q.value(0).toLongLong();
-    r.wallTsMs = q.value(1).toLongLong();
-    r.metaPath = q.value(2).toString();
-    r.latencyMs = q.value(3).toLongLong();
-    r.label = q.value(4).toString();
-    r.confidence = q.value(5).toDouble();
-    r.latDeg = q.value(6).toDouble();
-    r.lonDeg = q.value(7).toDouble();
-    items.push_back(r);
-  }
-  return items;
+  Q_UNUSED(limit);
+  return {};
 }
+
 
 } // namespace demo::client
