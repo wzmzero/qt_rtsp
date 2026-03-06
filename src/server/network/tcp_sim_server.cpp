@@ -21,6 +21,8 @@ namespace demo::server {
 
 TcpSimServer::TcpSimServer(std::uint16_t port) : port_(port) {}
 
+TcpSimServer::TcpSimServer(std::uint16_t port, const SimConfig& cfg) : port_(port), cfg_(cfg) {}
+
 int TcpSimServer::run() {
   try {
     running_ = true;
@@ -89,18 +91,19 @@ int TcpSimServer::run() {
         d.confidence = 0.95;
         d.source_ts_ms = now_ms - 15;
 
-        // 固定标签与置信度：仅 person + rod
-        const double personCx = 0.36 + (seq % 6) * 0.015;
-        const double personCy = 0.38;
-        const double personW = 0.30;
-        const double personH = 0.44;
-        const double rodCx = personCx + 0.02;
-        const double rodCy = personCy + 0.02;
+        // 仅 person + rod；若给定固定参数则严格按固定参数发送
+        const bool fixed = cfg_.fixed;
+        const double personCx = fixed ? cfg_.person_cx : (0.36 + (seq % 6) * 0.015);
+        const double personCy = fixed ? cfg_.person_cy : 0.38;
+        const double personW = cfg_.person_w;
+        const double personH = cfg_.person_h;
+        const double rodCx = fixed ? cfg_.rod_cx : (personCx + 0.02);
+        const double rodCy = fixed ? cfg_.rod_cy : (personCy + 0.02);
 
-        constexpr double personConf = 0.92;
-        constexpr double rodConf = 0.88;
+        const double personConf = cfg_.person_conf;
+        const double rodConf = cfg_.rod_conf;
         demo::protocol::DetectionObject person{"person", personConf, personCx, personCy, personW, personH};
-        demo::protocol::DetectionObject rod{"rod", rodConf, rodCx, rodCy, 0.28, 0.13};
+        demo::protocol::DetectionObject rod{"rod", rodConf, rodCx, rodCy, cfg_.rod_w, cfg_.rod_h};
         d.objects.push_back(person);
         d.objects.push_back(rod);
         demo::protocol::Gps g;

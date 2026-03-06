@@ -24,6 +24,18 @@ struct ServerOptions {
   int rtsp_retry_min_ms = 1000;
   int rtsp_retry_max_ms = 10000;
   int health_interval_sec = 0;
+
+  bool fixed_msg = false;
+  double person_conf = 0.92;
+  double rod_conf = 0.88;
+  double person_cx = 0.36;
+  double person_cy = 0.38;
+  double person_w = 0.30;
+  double person_h = 0.44;
+  double rod_cx = 0.38;
+  double rod_cy = 0.40;
+  double rod_w = 0.28;
+  double rod_h = 0.13;
 };
 
 struct SubsystemState {
@@ -51,6 +63,11 @@ void print_usage(const char* prog) {
             << "  --rtsp-retry-min-ms <ms>     RTSP restart min backoff (default: 1000)\n"
             << "  --rtsp-retry-max-ms <ms>     RTSP restart max backoff (default: 10000)\n"
             << "  --health-interval-sec <sec>  Health log interval; 0 disables (default: 0)\n"
+            << "  --fixed-msg                  Use fixed detection params (no motion)\n"
+            << "  --person-conf <v>            Fixed person confidence (default: 0.92)\n"
+            << "  --rod-conf <v>               Fixed rod confidence (default: 0.88)\n"
+            << "  --person-cx/cy/w/h <v>       Person bbox normalized params\n"
+            << "  --rod-cx/cy/w/h <v>          Rod bbox normalized params\n"
             << "  --help                       Show this help\n"
             << "\n"
             << "Compatibility (legacy positional):\n"
@@ -58,6 +75,7 @@ void print_usage(const char* prog) {
             << "Examples:\n"
             << "  " << prog << " --tcp-port 9000 --video media/test.mp4\n"
             << "  " << prog << " --tcp-port 9000 --health-interval-sec 0\n"
+            << "  " << prog << " --fixed-msg --person-conf 0.95 --rod-conf 0.85 --person-cx 0.40 --rod-cx 0.43\n"
             << "  " << prog << " 9000 media/test.mp4\n";
 }
 
@@ -122,6 +140,17 @@ bool parse_options(int argc, char** argv, ServerOptions& opts) {
       saw_named = true;
       continue;
     }
+    if (arg == "--fixed-msg") { opts.fixed_msg = true; saw_named = true; continue; }
+    if (arg == "--person-conf") { if (i + 1 >= argc) return false; opts.person_conf = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--rod-conf") { if (i + 1 >= argc) return false; opts.rod_conf = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--person-cx") { if (i + 1 >= argc) return false; opts.person_cx = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--person-cy") { if (i + 1 >= argc) return false; opts.person_cy = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--person-w") { if (i + 1 >= argc) return false; opts.person_w = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--person-h") { if (i + 1 >= argc) return false; opts.person_h = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--rod-cx") { if (i + 1 >= argc) return false; opts.rod_cx = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--rod-cy") { if (i + 1 >= argc) return false; opts.rod_cy = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--rod-w") { if (i + 1 >= argc) return false; opts.rod_w = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--rod-h") { if (i + 1 >= argc) return false; opts.rod_h = std::stod(argv[++i]); saw_named = true; continue; }
 
     if (!arg.empty() && arg[0] == '-') return false;
     if (saw_named) return false;
@@ -158,7 +187,19 @@ void run_tcp_loop(ServerOptions opts) {
   while (g_running) {
     try {
       update_state(g_tcp_state, "STARTING");
-      auto server = std::make_unique<demo::server::TcpSimServer>(opts.tcp_port);
+      demo::server::TcpSimServer::SimConfig cfg;
+      cfg.fixed = opts.fixed_msg;
+      cfg.person_conf = opts.person_conf;
+      cfg.rod_conf = opts.rod_conf;
+      cfg.person_cx = opts.person_cx;
+      cfg.person_cy = opts.person_cy;
+      cfg.person_w = opts.person_w;
+      cfg.person_h = opts.person_h;
+      cfg.rod_cx = opts.rod_cx;
+      cfg.rod_cy = opts.rod_cy;
+      cfg.rod_w = opts.rod_w;
+      cfg.rod_h = opts.rod_h;
+      auto server = std::make_unique<demo::server::TcpSimServer>(opts.tcp_port, cfg);
       g_tcp_server = std::move(server);
       update_state(g_tcp_state, "RUNNING");
       const int ret = g_tcp_server->run();
