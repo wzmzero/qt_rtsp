@@ -30,7 +30,7 @@ private slots:
 
 private:
   QTcpSocket* socket_{nullptr};
-  QTimer reconnectTimer_;
+  QTimer* reconnectTimer_{nullptr};
   QByteArray buf_;
   QString host_;
   quint16 port_{0};

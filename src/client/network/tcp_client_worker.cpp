@@ -17,12 +17,13 @@ QString labelFromId(int id) {
 
 TcpClientWorker::TcpClientWorker(QObject* parent) : QObject(parent) {
   socket_ = new QTcpSocket(this);
-  reconnectTimer_.setSingleShot(true);
+  reconnectTimer_ = new QTimer(this);
+  reconnectTimer_->setSingleShot(true);
 
   connect(socket_, &QTcpSocket::readyRead, this, &TcpClientWorker::onReadyRead);
   connect(socket_, &QTcpSocket::connected, this, &TcpClientWorker::onConnected);
   connect(socket_, &QTcpSocket::disconnected, this, &TcpClientWorker::onDisconnected);
-  connect(&reconnectTimer_, &QTimer::timeout, this, &TcpClientWorker::reconnect);
+  connect(reconnectTimer_, &QTimer::timeout, this, &TcpClientWorker::reconnect);
 }
 
 void TcpClientWorker::start(const QString& host, quint16 port, int reconnectIntervalMs) {
@@ -43,7 +44,7 @@ void TcpClientWorker::reconnect() {
 
 void TcpClientWorker::stop() {
   running_ = false;
-  reconnectTimer_.stop();
+  if (reconnectTimer_) reconnectTimer_->stop();
   socket_->disconnectFromHost();
 }
 
@@ -55,7 +56,7 @@ void TcpClientWorker::onConnected() {
 void TcpClientWorker::onDisconnected() {
   emit connectionStateChanged("disconnected");
   emit logMessage("TCP disconnected");
-  if (running_) reconnectTimer_.start(reconnectIntervalMs_);
+  if (running_ && reconnectTimer_) reconnectTimer_->start(reconnectIntervalMs_);
 }
 
 void TcpClientWorker::onReadyRead() {

@@ -15,15 +15,15 @@
 
 namespace demo::server {
 
-RtspLauncher::RtspLauncher(std::string ffmpeg_path, std::string input_path, std::string rtsp_url, bool required)
+RtspLauncher::RtspLauncher(std::string ffmpeg_path, std::string input_path, std::string rtsp_url, bool required, int pkt_size)
     : ffmpeg_path_(std::move(ffmpeg_path)), input_path_(std::move(input_path)), rtsp_url_(std::move(rtsp_url)),
-      required_(required) {}
+      required_(required), pkt_size_(pkt_size) {}
 
 std::string RtspLauncher::ffmpeg_command() const {
   std::ostringstream oss;
   oss << ffmpeg_path_ << " -re -stream_loop -1 -i \"" << input_path_
       << "\" -an -c:v libx264 -preset veryfast -tune zerolatency "
-      << "-f rtsp -rtsp_transport tcp \"" << rtsp_url_ << "\"";
+      << "-f rtsp -rtsp_transport tcp -pkt_size " << pkt_size_ << " \"" << rtsp_url_ << "\"";
   return oss.str();
 }
 
@@ -58,10 +58,19 @@ bool RtspLauncher::start() {
     args.push_back(const_cast<char*>("veryfast"));
     args.push_back(const_cast<char*>("-tune"));
     args.push_back(const_cast<char*>("zerolatency"));
+    args.push_back(const_cast<char*>("-g"));
+    args.push_back(const_cast<char*>("25"));
+    args.push_back(const_cast<char*>("-keyint_min"));
+    args.push_back(const_cast<char*>("25"));
+    args.push_back(const_cast<char*>("-sc_threshold"));
+    args.push_back(const_cast<char*>("0"));
     args.push_back(const_cast<char*>("-f"));
     args.push_back(const_cast<char*>("rtsp"));
     args.push_back(const_cast<char*>("-rtsp_transport"));
     args.push_back(const_cast<char*>("tcp"));
+    args.push_back(const_cast<char*>("-pkt_size"));
+    const std::string pkt_size_s = std::to_string(pkt_size_);
+    args.push_back(const_cast<char*>(pkt_size_s.c_str()));
     args.push_back(const_cast<char*>(rtsp_url_.c_str()));
     args.push_back(nullptr);
 
