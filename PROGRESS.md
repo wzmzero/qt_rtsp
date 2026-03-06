@@ -66,3 +66,14 @@ cmake --build build -j4
 3. 增加断线重连策略（TCP/RTSP）与状态机。
 4. 增加基础集成测试脚本（server + client smoke test）。
 
+
+### Git 提交阶段问题与修复
+**问题**
+- 初次 `git commit` 失败：未配置提交身份（`user.name/user.email`）。
+
+**修复**
+- 在仓库内设置本地身份：
+  - `git config user.name "OpenClaw Subagent"`
+  - `git config user.email "subagent@local"`
+- 重新提交成功。
+

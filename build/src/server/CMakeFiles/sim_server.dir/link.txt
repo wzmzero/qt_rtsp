@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/sim_server.dir/app/main.cpp.o CMakeFiles/sim_server.dir/network/tcp_sim_server.cpp.o CMakeFiles/sim_server.dir/media/rtsp_launcher.cpp.o -o sim_server 
