@@ -245,20 +245,6 @@ void run_rtsp_loop(ServerOptions opts) {
   update_state(g_rtsp_state, "STOPPED");
 }
 
-void print_health() {
-  SubsystemState tcp;
-  SubsystemState rtsp;
-  {
-    std::lock_guard<std::mutex> lk(g_state_mu);
-    tcp = g_tcp_state;
-    rtsp = g_rtsp_state;
-  }
-
-  std::cout << "[sim_server][health] tcp={status:" << tcp.status << ",retries:" << tcp.retries
-            << ",last_error:'" << tcp.last_error << "'} rtsp={status:" << rtsp.status << ",retries:" << rtsp.retries
-            << ",last_error:'" << rtsp.last_error << "'}\n";
-}
-
 } // namespace
 
 int main(int argc, char** argv) {
@@ -285,24 +271,12 @@ int main(int argc, char** argv) {
   std::signal(SIGINT, on_signal);
   std::signal(SIGTERM, on_signal);
 
-  std::cout << "[sim_server] starting supervisors (tcp + rtsp decoupled)\n";
 
   std::thread tcp_thread(run_tcp_loop, opts);
   std::thread rtsp_thread(run_rtsp_loop, opts);
 
   while (g_running) {
-    if (opts.health_interval_sec > 0) {
-      try {
-        print_health();
-      } catch (const std::exception& e) {
-        std::cerr << "[sim_server][health] EXCEPTION: " << e.what() << "\n";
-      } catch (...) {
-        std::cerr << "[sim_server][health] EXCEPTION: unknown\n";
-      }
-      std::this_thread::sleep_for(std::chrono::seconds(opts.health_interval_sec));
-    } else {
-      std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
+    std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 
   if (g_tcp_server) g_tcp_server->stop();
@@ -311,6 +285,5 @@ int main(int argc, char** argv) {
   if (tcp_thread.joinable()) tcp_thread.join();
   if (rtsp_thread.joinable()) rtsp_thread.join();
 
-  std::cout << "[sim_server] stopped\n";
   return 0;
 }

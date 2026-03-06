@@ -59,7 +59,6 @@ int TcpSimServer::run() {
       return 1;
     }
 
-    std::cout << "[sim_server][tcp] listening on 0.0.0.0:" << port_ << "\n";
 
     while (running_) {
       sockaddr_in cli{};
@@ -77,10 +76,6 @@ int TcpSimServer::run() {
       if (client_flags >= 0) {
         (void)::fcntl(client_fd, F_SETFD, client_flags | FD_CLOEXEC);
       }
-
-      char ip[INET_ADDRSTRLEN]{};
-      inet_ntop(AF_INET, &cli.sin_addr, ip, sizeof(ip));
-      std::cout << "[sim_server][tcp] client connected: " << ip << ":" << ntohs(cli.sin_port) << "\n";
 
       std::mt19937 rng{std::random_device{}()};
       std::uniform_int_distribution<int> shift(-30, 30);
