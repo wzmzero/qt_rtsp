@@ -6,12 +6,16 @@
 #include "network/tcp_client_worker.h"
 #include "repository/app_repository.h"
 
+#include <QAction>
 #include <QActionGroup>
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDateTime>
 #include <QDateTimeEdit>
+#include <QDialog>
+#include <QDoubleSpinBox>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
@@ -39,17 +43,36 @@
 #include <QStringList>
 #include <QTableWidget>
 #include <QTableWidgetItem>
-#include <QTimer>
 #include <QTextStream>
+#include <QTimer>
 #include <QToolButton>
 #include <QUrl>
+#include <QVBoxLayout>
 #include <QVideoSink>
 #include <QVideoWidget>
-#include <QVBoxLayout>
 
 namespace {
 double e7ToDegree(int e7) { return static_cast<double>(e7) / 10000000.0; }
+
+void setLampColor(QLabel* lamp, const QString& color) {
+  if (!lamp) return;
+  lamp->setStyleSheet(QString("background:%1;border-radius:7px;").arg(color));
 }
+
+QWidget* makeStateRow(const QString& title, QLabel** lamp, QLabel** text, QWidget* parent) {
+  auto* row = new QWidget(parent);
+  auto* layout = new QHBoxLayout(row);
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(8);
+  *lamp = new QLabel(row);
+  (*lamp)->setFixedSize(14, 14);
+  setLampColor(*lamp, "#475569");
+  *text = new QLabel(title + "：未连接", row);
+  layout->addWidget(*lamp);
+  layout->addWidget(*text, 1);
+  return row;
+}
+} // namespace
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   projectRootDir_ = QDir::currentPath();
@@ -121,10 +144,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   config_ = repo_->loadConfig();
   if (config_.recordDir.isEmpty()) config_.recordDir = "./recordings";
   config_.recordDir = resolvePath(config_.recordDir, "./recordings");
+  if (config_.theme.isEmpty()) config_.theme = "dark";
   applyConfigToUi(config_);
 
   if (!config_.windowGeometry.isEmpty()) restoreGeometry(config_.windowGeometry);
   if (!config_.windowState.isEmpty()) restoreState(config_.windowState);
+
+  refreshConnectionUi();
 
   statusBar()->showMessage(QString("工程目录: %1 | DB: %2").arg(projectRootDir_, dbDisplayPath_));
   appendLog("INFO", "app", QString("MainWindow initialized, DB display path=%1").arg(dbDisplayPath_));
@@ -132,9 +158,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   if (qEnvironmentVariableIsSet("QT_CLIENT_AUTOTEST")) {
     appendLog("INFO", "app", "AUTOTEST enabled: start->save->stop sequence");
     QTimer::singleShot(400, this, &MainWindow::onStartAll);
-    QTimer::singleShot(2000, this, &MainWindow::onSaveConfig);
-    QTimer::singleShot(3400, this, &MainWindow::onStopAll);
-    QTimer::singleShot(4300, qApp, &QCoreApplication::quit);
+    QTimer::singleShot(1500, this, &MainWindow::onSaveConfig);
+    QTimer::singleShot(2600, this, &MainWindow::onStopAll);
+    QTimer::singleShot(3400, qApp, &QCoreApplication::quit);
   }
 }
 
@@ -189,32 +215,19 @@ void MainWindow::setupMenus() {
   auto* themeGroup = new QActionGroup(this);
   themeGroup->setExclusive(true);
 
-  auto* darkAction = themeMenu->addAction("暗");
-  darkAction->setCheckable(true);
-  auto* lightAction = themeMenu->addAction("明");
-  lightAction->setCheckable(true);
-  themeGroup->addAction(darkAction);
-  themeGroup->addAction(lightAction);
+  darkThemeAction_ = themeMenu->addAction("暗");
+  darkThemeAction_->setCheckable(true);
+  lightThemeAction_ = themeMenu->addAction("明");
+  lightThemeAction_->setCheckable(true);
+  themeGroup->addAction(darkThemeAction_);
+  themeGroup->addAction(lightThemeAction_);
 
-  if (config_.theme == "light") {
-    lightAction->setChecked(true);
-  } else {
-    darkAction->setChecked(true);
-  }
-
-  connect(darkAction, &QAction::triggered, this, [this]() {
-    config_.theme = "dark";
-    applyTheme(config_.theme);
-  });
-  connect(lightAction, &QAction::triggered, this, [this]() {
-    config_.theme = "light";
-    applyTheme(config_.theme);
-  });
+  connect(darkThemeAction_, &QAction::triggered, this, &MainWindow::onThemeActionTriggered);
+  connect(lightThemeAction_, &QAction::triggered, this, &MainWindow::onThemeActionTriggered);
 
   auto* helpMenu = menuBar()->addMenu("帮助(Help)");
   helpMenu->addAction("关于", [this] { QMessageBox::information(this, "关于", "Qt RTSP + TCP Client\nPhase1 可用版本"); });
 }
-
 
 void MainWindow::setupUi() {
   setWindowTitle("Qt RTSP + TCP Client Demo");
@@ -227,7 +240,6 @@ void MainWindow::setupUi() {
 
   pages_ = new QStackedWidget(root);
 
-  // 实时页：左侧视频+状态，右侧参数与接收/解析数据
   auto* livePage = new QWidget(pages_);
   auto* liveLayout = new QHBoxLayout(livePage);
   liveLayout->setContentsMargins(8, 8, 8, 8);
@@ -236,7 +248,6 @@ void MainWindow::setupUi() {
   auto* leftCol = new QWidget(livePage);
   auto* leftLayout = new QVBoxLayout(leftCol);
   leftLayout->setContentsMargins(0, 0, 0, 0);
-  leftLayout->setSpacing(10);
 
   auto* videoBox = new QGroupBox("实时视频", leftCol);
   auto* videoLayout = new QVBoxLayout(videoBox);
@@ -253,39 +264,60 @@ void MainWindow::setupUi() {
   videoActionLayout->addWidget(screenshotBtn_);
   videoLayout->addWidget(videoActionRow);
 
-  auto* statusBox = new QGroupBox("连接与告警", leftCol);
-  auto* statusLayout = new QVBoxLayout(statusBox);
-
-  auto* connRow = new QHBoxLayout();
-  connLight_ = new QLabel(statusBox);
-  connLight_->setFixedSize(14, 14);
-  connLight_->setStyleSheet("background:#ef4444;border-radius:7px;");
-  connState_ = new QLabel("stopped", statusBox);
-  connLineLabel_ = new QLabel("RTSP: - | TCP: -", statusBox);
-  connLineLabel_->setWordWrap(true);
-  connRow->addWidget(connLight_);
-  connRow->addWidget(connState_);
-  connRow->addWidget(new QLabel("|", statusBox));
-  connRow->addWidget(connLineLabel_, 1);
-  statusLayout->addLayout(connRow);
-
-  auto* alertRow = new QHBoxLayout();
-  alertRow->addWidget(new QLabel("告警灯:", statusBox));
-  alertLight_ = new QLabel(statusBox);
-  alertLight_->setFixedSize(14, 14);
-  alertLight_->setStyleSheet("background:#334155;border-radius:7px;");
-  alertRow->addWidget(alertLight_);
-  alertStateLabel_ = new QLabel("组合告警: idle", statusBox);
-  alertRow->addWidget(alertStateLabel_, 1);
-  statusLayout->addLayout(alertRow);
-
-  leftLayout->addWidget(videoBox, 5);
-  leftLayout->addWidget(statusBox, 2);
+  leftLayout->addWidget(videoBox, 1);
 
   auto* rightCol = new QWidget(livePage);
   auto* rightLayout = new QVBoxLayout(rightCol);
   rightLayout->setContentsMargins(0, 0, 0, 0);
   rightLayout->setSpacing(10);
+
+  auto* connGroup = new QGroupBox("连接状态", rightCol);
+  auto* connLayout = new QVBoxLayout(connGroup);
+  connLayout->addWidget(makeStateRow("RTSP 是否连接", &rtspLight_, &rtspStateLabel_, connGroup));
+  connLayout->addWidget(makeStateRow("TCP 是否连接", &tcpLight_, &tcpStateLabel_, connGroup));
+  connLayout->addWidget(makeStateRow("是否响应绑定", &bindLight_, &bindStateLabel_, connGroup));
+
+  auto* dataGroup = new QGroupBox("数据接收", rightCol);
+  auto* dataLayout = new QVBoxLayout(dataGroup);
+
+  auto* rawGroup = new QGroupBox("原始接收数据摘要（最近20条，单条截断）", dataGroup);
+  auto* rawLayout = new QVBoxLayout(rawGroup);
+  recvDataView_ = new QPlainTextEdit(rawGroup);
+  recvDataView_->setReadOnly(true);
+  recvDataView_->setMinimumHeight(170);
+  rawDetailBtn_ = new QPushButton("查看完整", rawGroup);
+  connect(rawDetailBtn_, &QPushButton::clicked, this, &MainWindow::onShowRawDataDetail);
+  rawLayout->addWidget(recvDataView_);
+  rawLayout->addWidget(rawDetailBtn_, 0, Qt::AlignRight);
+
+  auto* parsedGroup = new QGroupBox("解析结果", dataGroup);
+  auto* parsedLayout = new QVBoxLayout(parsedGroup);
+  auto* alertRow = new QWidget(parsedGroup);
+  auto* alertLayout = new QHBoxLayout(alertRow);
+  alertLayout->setContentsMargins(0, 0, 0, 0);
+  alertLight_ = new QLabel(alertRow);
+  alertLight_->setFixedSize(14, 14);
+  setLampColor(alertLight_, "#334155");
+  alertStateLabel_ = new QLabel("person+rod/IoU 告警：idle", alertRow);
+  alertLayout->addWidget(alertLight_);
+  alertLayout->addWidget(alertStateLabel_, 1);
+
+  gpsLabel_ = new QLabel("经纬度: --", parsedGroup);
+  gpsLabel_->setStyleSheet("font-size:14px;font-weight:700;");
+  detectionSummaryLabel_ = new QLabel("检测摘要: --", parsedGroup);
+  detectionSummaryLabel_->setWordWrap(true);
+
+  parsedResultView_ = new QPlainTextEdit(parsedGroup);
+  parsedResultView_->setReadOnly(true);
+  parsedResultView_->setMinimumHeight(130);
+
+  parsedLayout->addWidget(alertRow);
+  parsedLayout->addWidget(gpsLabel_);
+  parsedLayout->addWidget(detectionSummaryLabel_);
+  parsedLayout->addWidget(parsedResultView_);
+
+  dataLayout->addWidget(rawGroup, 1);
+  dataLayout->addWidget(parsedGroup, 1);
 
   auto* cfgGroup = new QGroupBox("参数编辑区", rightCol);
   auto* form = new QFormLayout(cfgGroup);
@@ -296,6 +328,17 @@ void MainWindow::setupUi() {
   reconnectSpin_ = new QSpinBox(cfgGroup);
   reconnectSpin_->setRange(500, 60000);
   reconnectSpin_->setSingleStep(500);
+  alertLowSpin_ = new QDoubleSpinBox(cfgGroup);
+  alertMidSpin_ = new QDoubleSpinBox(cfgGroup);
+  alertHighSpin_ = new QDoubleSpinBox(cfgGroup);
+  for (auto* spin : {alertLowSpin_, alertMidSpin_, alertHighSpin_}) {
+    spin->setRange(0.0, 1.0);
+    spin->setSingleStep(0.01);
+    spin->setDecimals(2);
+  }
+  alertLowSpin_->setValue(alertLowThreshold_);
+  alertMidSpin_->setValue(alertMidThreshold_);
+  alertHighSpin_->setValue(alertHighThreshold_);
   recordDirEdit_ = new QLineEdit(cfgGroup);
   recordEnabledCheck_ = new QCheckBox("启用录制", cfgGroup);
 
@@ -324,30 +367,19 @@ void MainWindow::setupUi() {
   form->addRow("TCP Host", tcpHostEdit_);
   form->addRow("TCP Port", tcpPortSpin_);
   form->addRow("重连间隔(ms)", reconnectSpin_);
+  form->addRow("告警低阈值", alertLowSpin_);
+  form->addRow("告警中阈值", alertMidSpin_);
+  form->addRow("告警高阈值", alertHighSpin_);
   form->addRow("录制路径", recordRow);
   form->addRow("录制开关", recordEnabledCheck_);
   form->addRow("控制", buttonRow);
 
-  auto* rawGroup = new QGroupBox("接收数据", rightCol);
-  auto* rawLayout = new QVBoxLayout(rawGroup);
-  recvDataView_ = new QPlainTextEdit(rawGroup);
-  recvDataView_->setReadOnly(true);
-  recvDataView_->setMinimumHeight(190);
-  rawLayout->addWidget(recvDataView_);
-
-  auto* parsedGroup = new QGroupBox("解析结果", rightCol);
-  auto* parsedLayout = new QVBoxLayout(parsedGroup);
-  parsedResultView_ = new QPlainTextEdit(parsedGroup);
-  parsedResultView_->setReadOnly(true);
-  parsedResultView_->setMinimumHeight(170);
-  parsedLayout->addWidget(parsedResultView_);
-
+  rightLayout->addWidget(connGroup, 2);
+  rightLayout->addWidget(dataGroup, 5);
   rightLayout->addWidget(cfgGroup, 3);
-  rightLayout->addWidget(rawGroup, 4);
-  rightLayout->addWidget(parsedGroup, 3);
 
-  liveLayout->addWidget(leftCol, 3);
-  liveLayout->addWidget(rightCol, 2);
+  liveLayout->addWidget(leftCol, 5);
+  liveLayout->addWidget(rightCol, 3);
   pages_->addWidget(livePage);
 
   auto* playbackPage = new QWidget(pages_);
@@ -415,7 +447,6 @@ void MainWindow::setupUi() {
   connect(connBlinkTimer_, &QTimer::timeout, this, &MainWindow::blinkConnectionIndicator);
 }
 
-
 void MainWindow::onStartAll() {
   config_ = collectConfigFromUi();
   settings_->setValue("storage/data_dir", toStoredRelativePath(dataDir_));
@@ -424,6 +455,11 @@ void MainWindow::onStartAll() {
   settings_->sync();
   repo_->saveConfig(config_);
 
+  rtspConnected_ = false;
+  tcpConnected_ = false;
+  responseBound_ = false;
+  refreshConnectionUi();
+
   const QString runtimeRecordDir = resolvePath(config_.recordDir, "./recordings");
   QMetaObject::invokeMethod(tcp_, "start", Qt::QueuedConnection, Q_ARG(QString, config_.tcpHost),
                             Q_ARG(quint16, config_.tcpPort), Q_ARG(int, config_.reconnectIntervalMs));
@@ -431,7 +467,6 @@ void MainWindow::onStartAll() {
   if (config_.recordEnabled) QMetaObject::invokeMethod(recorder_, "start", Qt::QueuedConnection, Q_ARG(QString, runtimeRecordDir));
 
   statusBar()->showMessage(QString("运行中 | DB: %1").arg(dbDisplayPath_));
-  appendLog("INFO", "app", QString("StatusBar => 运行中 | DB: %1").arg(dbDisplayPath_));
   appendLog("INFO", "app", "Workers started");
 }
 
@@ -439,8 +474,12 @@ void MainWindow::onStopAll() {
   QMetaObject::invokeMethod(tcp_, "stop", Qt::QueuedConnection);
   QMetaObject::invokeMethod(stream_, "stop", Qt::QueuedConnection);
   QMetaObject::invokeMethod(recorder_, "stop", Qt::QueuedConnection);
+  rtspConnected_ = false;
+  tcpConnected_ = false;
+  responseBound_ = false;
+  connBlinkTimer_->stop();
+  refreshConnectionUi();
   statusBar()->showMessage(QString("已停止 | DB: %1").arg(dbDisplayPath_));
-  appendLog("INFO", "app", QString("StatusBar => 已停止 | DB: %1").arg(dbDisplayPath_));
   appendLog("INFO", "app", "Workers stopped");
 }
 
@@ -454,7 +493,7 @@ void MainWindow::onSaveConfig() {
   settings_->sync();
   repo_->saveConfig(config_);
   applyTheme(config_.theme);
-  appendLog("INFO", "app", "Config saved to QSettings + SQLite");
+  appendLog("INFO", "app", QString("Config saved, theme=%1").arg(config_.theme));
   if (!qEnvironmentVariableIsSet("QT_CLIENT_AUTOTEST")) {
     QMessageBox::information(this, "保存成功", "配置已保存，主题已应用。");
   }
@@ -462,66 +501,31 @@ void MainWindow::onSaveConfig() {
 
 void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
   lastPkt_ = pkt;
+  lastTelemetryTsMs_ = QDateTime::currentMSecsSinceEpoch();
+  tcpConnected_ = true;
+  responseBound_ = (lastFrameTsMs_ > 0 && qAbs(lastFrameTsMs_ - lastTelemetryTsMs_) < 5000);
 
-  const QString rawObjects = [&pkt]() {
-    QStringList lines;
-    int i = 0;
-    for (const auto& o : pkt.detection.objects) {
-      lines << QString("  [%1] %2 conf=%3 bbox(cx=%4,cy=%5,w=%6,h=%7)")
-                   .arg(i++)
-                   .arg(o.label)
-                   .arg(o.confidence, 0, 'f', 2)
-                   .arg(o.bbox.x(), 0, 'f', 3)
-                   .arg(o.bbox.y(), 0, 'f', 3)
-                   .arg(o.bbox.width(), 0, 'f', 3)
-                   .arg(o.bbox.height(), 0, 'f', 3);
-    }
-    return lines.join("\n");
-  }();
-
-  if (recvDataView_) {
-    recvDataView_->setPlainText(QString("raw_json: %1\n"
-                                        "timestamps(ms): source=%2 sent=%3 recv=%4\n"
-                                        "gps_raw(E7): lat=%5 lon=%6 alt_mm=%7 sat=%8\n"
-                                        "objects(%9):\n%10")
-                                    .arg(pkt.rawJsonLine)
-                                    .arg(pkt.detection.sourceTsMs)
-                                    .arg(pkt.sentTsMs)
-                                    .arg(pkt.recvTsMs)
-                                    .arg(pkt.gps.latE7)
-                                    .arg(pkt.gps.lonE7)
-                                    .arg(pkt.gps.altMm)
-                                    .arg(pkt.gps.satellitesVisible)
-                                    .arg(pkt.detection.objects.size())
-                                    .arg(rawObjects));
-  }
+  QString rawLine = pkt.rawJsonLine;
+  if (rawLine.size() > 220) rawLine = rawLine.left(220) + " ...";
+  rawHistory_.prepend(QString("[%1] %2")
+                          .arg(QDateTime::fromMSecsSinceEpoch(lastTelemetryTsMs_).toString("HH:mm:ss"), rawLine));
+  while (rawHistory_.size() > 200) rawHistory_.removeLast();
+  recvDataView_->setPlainText(rawHistory_.mid(0, 20).join("\n"));
 
   evaluatePersonRodAlert(pkt);
-
-  const QString parsed = QString("是否报警: %1\n"
-                                 "当前无人机坐标: lat=%2 (%3) lon=%4 (%5)\n"
-                                 "关键检测摘要: label=%6 conf=%7 objects=%8")
-                             .arg(alertActive_ ? "是" : "否")
-                             .arg(pkt.gps.latE7)
-                             .arg(e7ToDegree(pkt.gps.latE7), 0, 'f', 7)
-                             .arg(pkt.gps.lonE7)
-                             .arg(e7ToDegree(pkt.gps.lonE7), 0, 'f', 7)
-                             .arg(pkt.detection.label)
-                             .arg(pkt.detection.confidence, 0, 'f', 2)
-                             .arg(pkt.detection.objects.size());
-  if (parsedResultView_) parsedResultView_->setPlainText(parsed);
-
-  if (parsedResultView_) {
-    parsedResultView_->appendPlainText(QString("\nIoU阈值: %1").arg(alertIouThreshold_, 0, 'f', 2));
-  }
+  refreshParsedUi(pkt);
+  refreshConnectionUi();
   repo_->appendTelemetry(pkt);
 }
-
 
 void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
   if (videoWidget_ && videoWidget_->videoSink()) {
     videoWidget_->videoSink()->setVideoFrame(frame);
   }
+  rtspConnected_ = true;
+  lastFrameTsMs_ = tsMs > 0 ? tsMs : QDateTime::currentMSecsSinceEpoch();
+  responseBound_ = (lastTelemetryTsMs_ > 0 && qAbs(lastFrameTsMs_ - lastTelemetryTsMs_) < 5000);
+  refreshConnectionUi();
 
   if (!config_.recordEnabled) return;
   demo::client::RecordItem item;
@@ -533,24 +537,109 @@ void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
 
 void MainWindow::onConnectionStateChanged(const QString& state) {
   connStateValue_ = state;
-  if (connState_) connState_->setText(QString("连接状态: %1").arg(state));
-  if (connLineLabel_) {
-    connLineLabel_->setText(QString("RTSP: %1 | TCP: %2:%3").arg(config_.rtspUrl, config_.tcpHost).arg(config_.tcpPort));
-  }
-
-  const bool active = state.contains("connected", Qt::CaseInsensitive) || state.contains("running", Qt::CaseInsensitive);
-  if (active) {
+  const bool connected = state.contains("connected", Qt::CaseInsensitive) || state.contains("running", Qt::CaseInsensitive);
+  tcpConnected_ = connected;
+  if (connected) {
     connBlinkTimer_->start();
   } else {
     connBlinkTimer_->stop();
-    connLight_->setStyleSheet("background:#ef4444;border-radius:7px;");
+    connBlinkOn_ = false;
   }
+  refreshConnectionUi();
 }
 
+void MainWindow::onThemeActionTriggered() {
+  if (lightThemeAction_ && lightThemeAction_->isChecked()) {
+    config_.theme = "light";
+  } else {
+    config_.theme = "dark";
+  }
+  applyTheme(config_.theme);
+}
+
+void MainWindow::onShowRawDataDetail() {
+  auto* dlg = new QDialog(this);
+  dlg->setWindowTitle("完整原始接收数据");
+  dlg->resize(860, 560);
+  auto* v = new QVBoxLayout(dlg);
+  auto* viewer = new QPlainTextEdit(dlg);
+  viewer->setReadOnly(true);
+  viewer->setPlainText(rawHistory_.join("\n"));
+  v->addWidget(viewer);
+  auto* btns = new QDialogButtonBox(QDialogButtonBox::Close, dlg);
+  connect(btns, &QDialogButtonBox::rejected, dlg, &QDialog::reject);
+  v->addWidget(btns);
+  dlg->exec();
+}
 
 void MainWindow::blinkConnectionIndicator() {
   connBlinkOn_ = !connBlinkOn_;
-  connLight_->setStyleSheet(connBlinkOn_ ? "background:#22c55e;border-radius:7px;" : "background:#166534;border-radius:7px;");
+  refreshConnectionUi();
+}
+
+QString MainWindow::buildDetectionSummary(const demo::client::TelemetryPacket& pkt, int topN) const {
+  QStringList items;
+  for (const auto& o : pkt.detection.objects) {
+    items << QString("%1:%2").arg(o.label).arg(o.confidence, 0, 'f', 2);
+  }
+  const int shown = qMin(topN, items.size());
+  QString summary = shown > 0 ? items.mid(0, shown).join(" | ") : QString("无目标");
+  if (items.size() > shown) {
+    summary += QString(" | 其余%1个...").arg(items.size() - shown);
+  }
+  return summary;
+}
+
+void MainWindow::refreshConnectionUi() {
+  setLampColor(rtspLight_, rtspConnected_ ? "#22c55e" : "#ef4444");
+  setLampColor(bindLight_, responseBound_ ? "#22c55e" : "#ef4444");
+
+  if (tcpConnected_) {
+    setLampColor(tcpLight_, connBlinkOn_ ? "#22c55e" : "#166534");
+  } else {
+    setLampColor(tcpLight_, "#ef4444");
+  }
+
+  if (rtspStateLabel_) rtspStateLabel_->setText(QString("RTSP 是否连接：%1").arg(rtspConnected_ ? "是" : "否"));
+  if (tcpStateLabel_) tcpStateLabel_->setText(QString("TCP 是否连接：%1").arg(tcpConnected_ ? "是" : "否"));
+  if (bindStateLabel_) bindStateLabel_->setText(QString("是否响应绑定：%1").arg(responseBound_ ? "是" : "否"));
+}
+
+void MainWindow::refreshParsedUi(const demo::client::TelemetryPacket& pkt) {
+  if (gpsLabel_) {
+    gpsLabel_->setText(
+        QString("经纬度: %1°, %2°")
+            .arg(e7ToDegree(pkt.gps.latE7), 0, 'f', 7)
+            .arg(e7ToDegree(pkt.gps.lonE7), 0, 'f', 7));
+  }
+  if (detectionSummaryLabel_) {
+    detectionSummaryLabel_->setText(QString("检测摘要: %1").arg(buildDetectionSummary(pkt)));
+  }
+
+  double personConf = 0.0;
+  double rodConf = 0.0;
+  for (const auto& o : pkt.detection.objects) {
+    const auto lb = o.label.trimmed().toLower();
+    if (lb == "person") personConf = qMax(personConf, o.confidence);
+    if (lb == "rod") rodConf = qMax(rodConf, o.confidence);
+  }
+
+  QString level = "无告警";
+  if (personConf >= alertHighThreshold_ && rodConf >= alertHighThreshold_) level = "高告警(红色)";
+  else if (personConf >= alertMidThreshold_ && rodConf >= alertMidThreshold_) level = "中告警(深黄)";
+  else if (personConf >= alertLowThreshold_ && rodConf >= alertLowThreshold_) level = "低告警(浅黄)";
+
+  QStringList details;
+  details << QString("告警级别: %1").arg(level);
+  details << QString("触发条件: person_conf=%1, rod_conf=%2")
+                 .arg(personConf, 0, 'f', 2)
+                 .arg(rodConf, 0, 'f', 2);
+  details << QString("阈值 low/mid/high: %1 / %2 / %3")
+                 .arg(alertLowThreshold_, 0, 'f', 2)
+                 .arg(alertMidThreshold_, 0, 'f', 2)
+                 .arg(alertHighThreshold_, 0, 'f', 2);
+  details << QString("objects: %1").arg(pkt.detection.objects.size());
+  parsedResultView_->setPlainText(details.join("\n"));
 }
 
 QString MainWindow::saveScreenshotWithMetadata(const QString& reasonTag) {
@@ -609,7 +698,10 @@ demo::client::AppConfig MainWindow::collectConfigFromUi() const {
   cfg.reconnectIntervalMs = reconnectSpin_->value();
   cfg.recordDir = toStoredRelativePath(resolvePath(recordDirEdit_->text().trimmed(), "./recordings"));
   cfg.recordEnabled = recordEnabledCheck_->isChecked();
-  if (cfg.theme.isEmpty()) cfg.theme = config_.theme;
+  cfg.theme = config_.theme.isEmpty() ? "dark" : config_.theme;
+  cfg.alertLowThreshold = alertLowSpin_ ? alertLowSpin_->value() : alertLowThreshold_;
+  cfg.alertMidThreshold = alertMidSpin_ ? alertMidSpin_->value() : alertMidThreshold_;
+  cfg.alertHighThreshold = alertHighSpin_ ? alertHighSpin_->value() : alertHighThreshold_;
   return cfg;
 }
 
@@ -620,7 +712,18 @@ void MainWindow::applyConfigToUi(const demo::client::AppConfig& cfg) {
   reconnectSpin_->setValue(cfg.reconnectIntervalMs);
   recordDirEdit_->setText(toStoredRelativePath(resolvePath(cfg.recordDir, "./recordings")));
   recordEnabledCheck_->setChecked(cfg.recordEnabled);
-  applyTheme(cfg.theme);
+  config_.theme = cfg.theme.isEmpty() ? "dark" : cfg.theme;
+  alertLowThreshold_ = cfg.alertLowThreshold;
+  alertMidThreshold_ = cfg.alertMidThreshold;
+  alertHighThreshold_ = cfg.alertHighThreshold;
+  if (alertLowSpin_) alertLowSpin_->setValue(alertLowThreshold_);
+  if (alertMidSpin_) alertMidSpin_->setValue(alertMidThreshold_);
+  if (alertHighSpin_) alertHighSpin_->setValue(alertHighThreshold_);
+  if (darkThemeAction_ && lightThemeAction_) {
+    darkThemeAction_->setChecked(config_.theme != "light");
+    lightThemeAction_->setChecked(config_.theme == "light");
+  }
+  applyTheme(config_.theme);
 }
 
 void MainWindow::applyTheme(const QString& theme) {
@@ -654,7 +757,6 @@ void MainWindow::appendLog(const QString& level, const QString& type, const QStr
   refreshLogView();
 }
 
-
 QString MainWindow::resolvePath(const QString& configuredPath, const QString& defaultRelative) const {
   const QString raw = configuredPath.trimmed().isEmpty() ? defaultRelative : configuredPath.trimmed();
   const QFileInfo fi(raw);
@@ -683,50 +785,41 @@ double MainWindow::bboxIoU(const QRectF& a, const QRectF& b) const {
 }
 
 void MainWindow::evaluatePersonRodAlert(const demo::client::TelemetryPacket& pkt) {
-  QVector<demo::client::DetectionObject> persons;
-  QVector<demo::client::DetectionObject> rods;
+  double personConf = 0.0;
+  double rodConf = 0.0;
   for (const auto& obj : pkt.detection.objects) {
     const auto lb = obj.label.trimmed().toLower();
-    if (lb == "person") persons.push_back(obj);
-    if (lb == "rod") rods.push_back(obj);
+    if (lb == "person") personConf = qMax(personConf, obj.confidence);
+    if (lb == "rod") rodConf = qMax(rodConf, obj.confidence);
   }
 
-  bool hit = false;
-  double maxIou = 0.0;
-  for (const auto& p : persons) {
-    for (const auto& r : rods) {
-      const double iou = bboxIoU(p.bbox, r.bbox);
-      if (iou > maxIou) maxIou = iou;
-      if (iou >= alertIouThreshold_) {
-        hit = true;
-      }
-    }
+  const bool lowHit = personConf >= alertLowThreshold_ && rodConf >= alertLowThreshold_;
+  const bool midHit = personConf >= alertMidThreshold_ && rodConf >= alertMidThreshold_;
+  const bool highHit = personConf >= alertHighThreshold_ && rodConf >= alertHighThreshold_;
+
+  alertActive_ = lowHit;
+  QString levelText = "idle";
+  if (highHit) {
+    setLampColor(alertLight_, "#ef4444");
+    levelText = "high";
+    if (alertStateLabel_) alertStateLabel_->setText(QString("告警：高(红) person=%1 rod=%2").arg(personConf, 0, 'f', 2).arg(rodConf, 0, 'f', 2));
+  } else if (midHit) {
+    setLampColor(alertLight_, "#f59e0b");
+    levelText = "mid";
+    if (alertStateLabel_) alertStateLabel_->setText(QString("告警：中(深黄) person=%1 rod=%2").arg(personConf, 0, 'f', 2).arg(rodConf, 0, 'f', 2));
+  } else if (lowHit) {
+    setLampColor(alertLight_, "#fde68a");
+    levelText = "low";
+    if (alertStateLabel_) alertStateLabel_->setText(QString("告警：低(浅黄) person=%1 rod=%2").arg(personConf, 0, 'f', 2).arg(rodConf, 0, 'f', 2));
+  } else {
+    setLampColor(alertLight_, "#334155");
+    if (alertStateLabel_) alertStateLabel_->setText("告警：idle（需同帧出现person与rod）");
   }
 
-  alertActive_ = hit;
-  if (alertLight_) {
-    alertLight_->setStyleSheet(hit ? "background:#f59e0b;border-radius:7px;" : "background:#334155;border-radius:7px;");
-  }
-  if (alertStateLabel_) {
-    alertStateLabel_->setText(hit ? QString("组合告警: ACTIVE (IoU=%1)").arg(maxIou, 0, 'f', 2)
-                                  : QString("组合告警: idle (maxIoU=%1)").arg(maxIou, 0, 'f', 2));
-  }
-
-  static qint64 lastAlertLogMs = 0;
-  const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-  if (hit && nowMs - lastAlertLogMs > 1500) {
-    lastAlertLogMs = nowMs;
-    QJsonArray arr;
-    for (const auto& obj : pkt.detection.objects) {
-      QJsonObject jo;
-      jo["label"] = obj.label;
-      jo["confidence"] = obj.confidence;
-      jo["bbox"] = QJsonArray{obj.bbox.x(), obj.bbox.y(), obj.bbox.width(), obj.bbox.height()};
-      arr.push_back(jo);
-    }
-    appendLog("WARN", "event", QString("person+rod告警触发, IoU=%1, objects=%2")
-                                  .arg(maxIou, 0, 'f', 2)
-                                  .arg(QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact))));
+  static QString lastLevel;
+  if (lastLevel != levelText) {
+    appendLog("INFO", "event", QString("告警级别切换: %1 (person=%2, rod=%3)").arg(levelText).arg(personConf, 0, 'f', 2).arg(rodConf, 0, 'f', 2));
+    lastLevel = levelText;
   }
 }
 

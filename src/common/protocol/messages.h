@@ -60,11 +60,6 @@ inline std::string to_json_line(const Detection& d, const Gps& g, std::int64_t s
       << "\"lat_e7\":" << g.lat_e7 << ","
       << "\"lon_e7\":" << g.lon_e7 << ","
       << "\"alt_mm\":" << g.alt_mm << ","
-      << "\"eph_cm\":" << g.eph_cm << ","
-      << "\"epv_cm\":" << g.epv_cm << ","
-      << "\"vel_cms\":" << g.vel_cms << ","
-      << "\"cog_cdeg\":" << g.cog_cdeg << ","
-      << "\"fix_type\":" << static_cast<int>(g.fix_type) << ","
       << "\"satellites_visible\":" << static_cast<int>(g.satellites_visible) << "}"
       << "}";
   oss << "\n";

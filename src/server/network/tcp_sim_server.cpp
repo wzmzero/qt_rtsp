@@ -91,8 +91,8 @@ int TcpSimServer::run() {
         const auto now_ms = demo::core::now_ms();
 
         demo::protocol::Detection d;
-        d.label = (seq % 4 == 0) ? "person" : ((seq % 4 == 1) ? "rod" : ((seq % 4 == 2) ? "boat" : "none"));
-        d.confidence = conf(rng);
+        d.label = "person+rod";
+        d.confidence = 0.90;
         d.source_ts_ms = now_ms - 15;
 
         // YOLO normalized bbox: cx,cy,w,h in [0,1]
@@ -104,8 +104,11 @@ int TcpSimServer::run() {
         const double rodCx = closePair ? (personCx + 0.01) : (personCx + 0.28);
         const double rodCy = closePair ? (personCy + 0.01) : (personCy + 0.20);
 
-        demo::protocol::DetectionObject person{"person", conf(rng), personCx, personCy, personW, personH};
-        demo::protocol::DetectionObject rod{"rod", conf(rng), rodCx, rodCy, 0.28, 0.13};
+        const int level = seq % 3; // 0 low,1 mid,2 high
+        const double personConf = (level == 0) ? 0.56 : (level == 1 ? 0.74 : 0.90);
+        const double rodConf = (level == 0) ? 0.53 : (level == 1 ? 0.76 : 0.88);
+        demo::protocol::DetectionObject person{"person", personConf, personCx, personCy, personW, personH};
+        demo::protocol::DetectionObject rod{"rod", rodConf, rodCx, rodCy, 0.28, 0.13};
         demo::protocol::DetectionObject boat{"boat", conf(rng), 0.70, 0.42, 0.26, 0.20};
         demo::protocol::DetectionObject buoy{"buoy", conf(rng), 0.12 + (seq % 5) * 0.03, 0.70, 0.08, 0.10};
         d.objects.push_back(person);

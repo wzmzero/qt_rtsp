@@ -9,6 +9,7 @@
 #include <QVideoFrame>
 
 QT_BEGIN_NAMESPACE
+class QAction;
 class QCheckBox;
 class QComboBox;
 class QDateTimeEdit;
@@ -18,6 +19,7 @@ class QListWidget;
 class QPlainTextEdit;
 class QPushButton;
 class QSpinBox;
+class QDoubleSpinBox;
 class QStackedWidget;
 class QTableWidget;
 class QVideoWidget;
@@ -46,6 +48,8 @@ private slots:
   void onTelemetry(const demo::client::TelemetryPacket& pkt);
   void onFrame(const QVideoFrame& frame, qint64 tsMs);
   void onConnectionStateChanged(const QString& state);
+  void onThemeActionTriggered();
+  void onShowRawDataDetail();
   void onCaptureScreenshot();
   void onRefreshEvents();
   void onLogFilterChanged();
@@ -65,6 +69,9 @@ private:
   void ensureRuntimeDirs();
   void evaluatePersonRodAlert(const demo::client::TelemetryPacket& pkt);
   double bboxIoU(const QRectF& a, const QRectF& b) const;
+  void refreshConnectionUi();
+  void refreshParsedUi(const demo::client::TelemetryPacket& pkt);
+  QString buildDetectionSummary(const demo::client::TelemetryPacket& pkt, int topN = 3) const;
 
   struct LogEntry {
     qint64 tsMs{0};
@@ -75,11 +82,16 @@ private:
 
   QStackedWidget* pages_{nullptr};
 
-  QLabel* connState_{nullptr};
-  QLabel* connLineLabel_{nullptr};
-  QLabel* connLight_{nullptr};
+  QLabel* rtspStateLabel_{nullptr};
+  QLabel* tcpStateLabel_{nullptr};
+  QLabel* bindStateLabel_{nullptr};
+  QLabel* rtspLight_{nullptr};
+  QLabel* tcpLight_{nullptr};
+  QLabel* bindLight_{nullptr};
   QLabel* alertLight_{nullptr};
   QLabel* alertStateLabel_{nullptr};
+  QLabel* gpsLabel_{nullptr};
+  QLabel* detectionSummaryLabel_{nullptr};
   QPlainTextEdit* recvDataView_{nullptr};
   QPlainTextEdit* parsedResultView_{nullptr};
 
@@ -87,6 +99,9 @@ private:
   QLineEdit* tcpHostEdit_{nullptr};
   QSpinBox* tcpPortSpin_{nullptr};
   QSpinBox* reconnectSpin_{nullptr};
+  QDoubleSpinBox* alertLowSpin_{nullptr};
+  QDoubleSpinBox* alertMidSpin_{nullptr};
+  QDoubleSpinBox* alertHighSpin_{nullptr};
   QLineEdit* recordDirEdit_{nullptr};
   QCheckBox* recordEnabledCheck_{nullptr};
 
@@ -101,9 +116,19 @@ private:
 
   QVideoWidget* videoWidget_{nullptr};
   QPushButton* screenshotBtn_{nullptr};
+  QPushButton* rawDetailBtn_{nullptr};
   QTimer* connBlinkTimer_{nullptr};
   bool connBlinkOn_{false};
   QString connStateValue_;
+  bool rtspConnected_{false};
+  bool tcpConnected_{false};
+  bool responseBound_{false};
+  qint64 lastFrameTsMs_{0};
+  qint64 lastTelemetryTsMs_{0};
+  QStringList rawHistory_;
+
+  QAction* darkThemeAction_{nullptr};
+  QAction* lightThemeAction_{nullptr};
 
   QList<LogEntry> logEntries_;
 
@@ -129,5 +154,7 @@ private:
   QString dbDisplayPath_;
   QString logFilePath_;
   bool alertActive_{false};
-  double alertIouThreshold_{0.10};
+  double alertLowThreshold_{0.50};
+  double alertMidThreshold_{0.70};
+  double alertHighThreshold_{0.85};
 };
