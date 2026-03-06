@@ -13,6 +13,68 @@
 
 namespace demo::client {
 
+namespace {
+int labelIdFromName(const QString& name) {
+  const auto n = name.trimmed().toLower();
+  if (n == "person") return 0;
+  if (n == "rod") return 1;
+  return -1;
+}
+
+qint64 persistTelemetryPacket(QSqlDatabase& db, const demo::client::TelemetryPacket& pkt) {
+  QSqlQuery t(db);
+  t.prepare("INSERT INTO telemetry_msg(recv_ts_ms,sent_ts_ms,source_ts_ms) VALUES(?,?,?);");
+  t.addBindValue(pkt.recvTsMs);
+  t.addBindValue(pkt.sentTsMs);
+  t.addBindValue(pkt.detection.sourceTsMs);
+  if (!t.exec()) {
+    qWarning() << "Insert telemetry_msg failed:" << t.lastError().text();
+    return -1;
+  }
+  const qint64 telemetryId = t.lastInsertId().toLongLong();
+
+  QSqlQuery d(db);
+  d.prepare("INSERT INTO detection_object(telemetry_id,obj_index,label_id,label,confidence,cx,cy,w,h) VALUES(?,?,?,?,?,?,?,?,?);");
+  for (int i = 0; i < pkt.detection.objects.size(); ++i) {
+    const auto& obj = pkt.detection.objects[i];
+    d.addBindValue(telemetryId);
+    d.addBindValue(i);
+    d.addBindValue(labelIdFromName(obj.label));
+    d.addBindValue(obj.label);
+    d.addBindValue(obj.confidence);
+    d.addBindValue(obj.bbox.x());
+    d.addBindValue(obj.bbox.y());
+    d.addBindValue(obj.bbox.width());
+    d.addBindValue(obj.bbox.height());
+    if (!d.exec()) {
+      qWarning() << "Insert detection_object failed:" << d.lastError().text();
+    }
+    d.finish();
+  }
+
+  QSqlQuery g(db);
+  g.prepare("INSERT INTO gps_msg(telemetry_id,time_usec,lat_e7,lon_e7,alt_mm,vel_cms,cog_cdeg,fix_type,satellites_visible,lat_deg,lon_deg) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?);");
+  g.addBindValue(telemetryId);
+  g.addBindValue(pkt.gps.timeUsec);
+  g.addBindValue(pkt.gps.latE7);
+  g.addBindValue(pkt.gps.lonE7);
+  g.addBindValue(pkt.gps.altMm);
+  g.addBindValue(pkt.gps.velCms);
+  g.addBindValue(pkt.gps.cogCdeg);
+  g.addBindValue(pkt.gps.fixType);
+  g.addBindValue(pkt.gps.satellitesVisible);
+  g.addBindValue(static_cast<double>(pkt.gps.latE7) / 10000000.0);
+  g.addBindValue(static_cast<double>(pkt.gps.lonE7) / 10000000.0);
+  if (!g.exec()) {
+    qWarning() << "Insert gps_msg failed:" << g.lastError().text();
+  }
+
+  return telemetryId;
+}
+} // namespace
+
+
 SQLiteDatabaseService::SQLiteDatabaseService(const QString& dbPath, QObject* parent)
     : QObject(parent), dbPath_(dbPath) {}
 
@@ -130,6 +192,34 @@ bool SQLiteDatabaseService::migrate() {
     return false;
   }
 
+  if (!q.exec("CREATE TABLE IF NOT EXISTS telemetry_msg("
+              "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+              "recv_ts_ms INTEGER NOT NULL, sent_ts_ms INTEGER NOT NULL, source_ts_ms INTEGER NOT NULL);")) {
+    qWarning() << "Create telemetry_msg failed:" << q.lastError().text();
+    return false;
+  }
+
+  if (!q.exec("CREATE TABLE IF NOT EXISTS detection_object("
+              "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+              "telemetry_id INTEGER NOT NULL,"
+              "obj_index INTEGER NOT NULL,"
+              "label_id INTEGER, label TEXT, confidence REAL, cx REAL, cy REAL, w REAL, h REAL,"
+              "FOREIGN KEY(telemetry_id) REFERENCES telemetry_msg(id));")) {
+    qWarning() << "Create detection_object failed:" << q.lastError().text();
+    return false;
+  }
+
+  if (!q.exec("CREATE TABLE IF NOT EXISTS gps_msg("
+              "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+              "telemetry_id INTEGER NOT NULL UNIQUE,"
+              "time_usec INTEGER, lat_e7 INTEGER, lon_e7 INTEGER, alt_mm INTEGER,"
+              "vel_cms INTEGER, cog_cdeg INTEGER, fix_type INTEGER, satellites_visible INTEGER,"
+              "lat_deg REAL, lon_deg REAL,"
+              "FOREIGN KEY(telemetry_id) REFERENCES telemetry_msg(id));")) {
+    qWarning() << "Create gps_msg failed:" << q.lastError().text();
+    return false;
+  }
+
   if (!q.exec("CREATE TABLE IF NOT EXISTS app_logs("
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
               "ts_ms INTEGER NOT NULL,"
@@ -155,6 +245,9 @@ bool SQLiteDatabaseService::migrate() {
   q.exec("CREATE INDEX IF NOT EXISTS idx_gps_telemetry ON gps_samples(telemetry_id);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_snapshot_filter ON snapshot_events(is_target_event, event_ts_ms, label);");
   q.exec("CREATE INDEX IF NOT EXISTS idx_logs_filter ON app_logs(level, type, ts_ms);");
+  q.exec("CREATE INDEX IF NOT EXISTS idx_tm_recv ON telemetry_msg(recv_ts_ms);");
+  q.exec("CREATE INDEX IF NOT EXISTS idx_do_tm ON detection_object(telemetry_id, obj_index);");
+  q.exec("CREATE INDEX IF NOT EXISTS idx_gm_tm ON gps_msg(telemetry_id);");
 
   if (version < 3) {
     const bool hasLegacy = q.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='telemetry_objects';") && q.next();
@@ -284,49 +377,9 @@ void SQLiteDatabaseService::saveConfigAsync(const demo::client::AppConfig& cfg) 
 
 void SQLiteDatabaseService::insertTelemetryAsync(const demo::client::TelemetryPacket& pkt) {
   if (!ensureConnection()) return;
-
-  QSqlQuery telemetryQ(db_);
-  telemetryQ.prepare("INSERT INTO telemetry_results(recv_ts_ms,sent_ts_ms,source_ts_ms,label,confidence,detection_objects_json) VALUES(?,?,?,?,?,?);");
-  telemetryQ.addBindValue(pkt.recvTsMs);
-  telemetryQ.addBindValue(pkt.sentTsMs);
-  telemetryQ.addBindValue(pkt.detection.sourceTsMs);
-  telemetryQ.addBindValue(pkt.detection.label);
-  telemetryQ.addBindValue(pkt.detection.confidence);
-  QJsonArray objects;
-  for (const auto& obj : pkt.detection.objects) {
-    QJsonObject jo;
-    jo["label"] = obj.label;
-    jo["confidence"] = obj.confidence;
-    jo["bbox"] = QJsonArray{obj.bbox.x(), obj.bbox.y(), obj.bbox.width(), obj.bbox.height()};
-    objects.push_back(jo);
-  }
-  telemetryQ.addBindValue(QString::fromUtf8(QJsonDocument(objects).toJson(QJsonDocument::Compact)));
-  if (!telemetryQ.exec()) {
-    qWarning() << "Insert telemetry_results failed:" << telemetryQ.lastError().text();
-    return;
-  }
-
-  const auto telemetryId = telemetryQ.lastInsertId().toLongLong();
-
-  QSqlQuery gpsQ(db_);
-  gpsQ.prepare("INSERT INTO gps_samples(telemetry_id,sample_ts_ms,time_usec,lat_e7,lon_e7,alt_mm,vel_cms,cog_cdeg,fix_type,satellites_visible,lat_deg,lon_deg) "
-               "VALUES(?,?,?,?,?,?,?,?,?,?,?,?);");
-  gpsQ.addBindValue(telemetryId);
-  gpsQ.addBindValue(pkt.recvTsMs);
-  gpsQ.addBindValue(pkt.gps.timeUsec);
-  gpsQ.addBindValue(pkt.gps.latE7);
-  gpsQ.addBindValue(pkt.gps.lonE7);
-  gpsQ.addBindValue(pkt.gps.altMm);
-  gpsQ.addBindValue(pkt.gps.velCms);
-  gpsQ.addBindValue(pkt.gps.cogCdeg);
-  gpsQ.addBindValue(pkt.gps.fixType);
-  gpsQ.addBindValue(pkt.gps.satellitesVisible);
-  gpsQ.addBindValue(static_cast<double>(pkt.gps.latE7) / 10000000.0);
-  gpsQ.addBindValue(static_cast<double>(pkt.gps.lonE7) / 10000000.0);
-  if (!gpsQ.exec()) {
-    qWarning() << "Insert gps_samples failed:" << gpsQ.lastError().text();
-  }
+  (void)persistTelemetryPacket(db_, pkt);
 }
+
 
 void SQLiteDatabaseService::insertSnapshotEventAsync(const demo::client::TelemetryPacket& pkt,
                                                      const QByteArray& screenshotBlob,
@@ -335,45 +388,8 @@ void SQLiteDatabaseService::insertSnapshotEventAsync(const demo::client::Telemet
   if (!ensureConnection()) return;
   if (screenshotBlob.isEmpty()) return;
 
-  QSqlQuery telemetryQ(db_);
-  telemetryQ.prepare("INSERT INTO telemetry_results(recv_ts_ms,sent_ts_ms,source_ts_ms,label,confidence,detection_objects_json) VALUES(?,?,?,?,?,?);");
-  telemetryQ.addBindValue(pkt.recvTsMs);
-  telemetryQ.addBindValue(pkt.sentTsMs);
-  telemetryQ.addBindValue(pkt.detection.sourceTsMs);
-  telemetryQ.addBindValue(pkt.detection.label);
-  telemetryQ.addBindValue(pkt.detection.confidence);
-  QJsonArray objects;
-  for (const auto& obj : pkt.detection.objects) {
-    QJsonObject jo;
-    jo["label"] = obj.label;
-    jo["confidence"] = obj.confidence;
-    jo["bbox"] = QJsonArray{obj.bbox.x(), obj.bbox.y(), obj.bbox.width(), obj.bbox.height()};
-    objects.push_back(jo);
-  }
-  telemetryQ.addBindValue(QString::fromUtf8(QJsonDocument(objects).toJson(QJsonDocument::Compact)));
-  if (!telemetryQ.exec()) {
-    qWarning() << "Insert telemetry for snapshot failed:" << telemetryQ.lastError().text();
-    return;
-  }
-
-  const auto telemetryId = telemetryQ.lastInsertId().toLongLong();
-
-  QSqlQuery gpsQ(db_);
-  gpsQ.prepare("INSERT INTO gps_samples(telemetry_id,sample_ts_ms,time_usec,lat_e7,lon_e7,alt_mm,vel_cms,cog_cdeg,fix_type,satellites_visible,lat_deg,lon_deg) "
-               "VALUES(?,?,?,?,?,?,?,?,?,?,?,?);");
-  gpsQ.addBindValue(telemetryId);
-  gpsQ.addBindValue(pkt.recvTsMs);
-  gpsQ.addBindValue(pkt.gps.timeUsec);
-  gpsQ.addBindValue(pkt.gps.latE7);
-  gpsQ.addBindValue(pkt.gps.lonE7);
-  gpsQ.addBindValue(pkt.gps.altMm);
-  gpsQ.addBindValue(pkt.gps.velCms);
-  gpsQ.addBindValue(pkt.gps.cogCdeg);
-  gpsQ.addBindValue(pkt.gps.fixType);
-  gpsQ.addBindValue(pkt.gps.satellitesVisible);
-  gpsQ.addBindValue(static_cast<double>(pkt.gps.latE7) / 10000000.0);
-  gpsQ.addBindValue(static_cast<double>(pkt.gps.lonE7) / 10000000.0);
-  gpsQ.exec();
+  const auto telemetryId = persistTelemetryPacket(db_, pkt);
+  if (telemetryId <= 0) return;
 
   QSqlQuery q(db_);
   q.prepare("INSERT INTO snapshot_events(event_ts_ms,telemetry_id,screenshot_path,screenshot_blob,reason_tag,label,confidence,is_target_event) "
@@ -390,6 +406,7 @@ void SQLiteDatabaseService::insertSnapshotEventAsync(const demo::client::Telemet
     qWarning() << "Insert snapshot_events failed:" << q.lastError().text();
   }
 }
+
 
 void SQLiteDatabaseService::insertAppLogAsync(qint64 tsMs, const QString& level, const QString& type,
                                               const QString& message) {
@@ -428,10 +445,11 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
   if (!ensureConnection()) return items;
 
   QString sql = "SELECT se.event_ts_ms, se.screenshot_path, se.screenshot_blob, se.label, se.confidence, se.is_target_event, "
-                "IFNULL(gs.lat_deg,0), IFNULL(gs.lon_deg,0), IFNULL(tr.detection_objects_json,'[]') "
+                "IFNULL(gm.lat_deg,0), IFNULL(gm.lon_deg,0), "
+                "IFNULL((SELECT GROUP_CONCAT(printf('%s:[%.2f,%.2f,%.2f,%.2f]', do.label, do.cx, do.cy, do.w, do.h), ' | ') "
+                "        FROM detection_object do WHERE do.telemetry_id = se.telemetry_id ORDER BY do.obj_index LIMIT 2), '') "
                 "FROM snapshot_events se "
-                "LEFT JOIN telemetry_results tr ON tr.id = se.telemetry_id "
-                "LEFT JOIN gps_samples gs ON gs.telemetry_id = se.telemetry_id "
+                "LEFT JOIN gps_msg gm ON gm.telemetry_id = se.telemetry_id "
                 "WHERE se.is_target_event = 1 AND se.event_ts_ms BETWEEN ? AND ?";
   if (!label.trimmed().isEmpty()) {
     sql += " AND se.label = ?";
