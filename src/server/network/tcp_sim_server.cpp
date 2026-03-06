@@ -15,9 +15,69 @@
 #include <string>
 #include <sys/socket.h>
 #include <thread>
+#include <algorithm>
+#include <vector>
+#include <sstream>
+#include <map>
+#include <fstream>
 #include <unistd.h>
 
 namespace demo::server {
+
+
+namespace {
+std::map<int, std::string> loadClassMap(const std::string& path) {
+  std::map<int, std::string> mp{{0, "person"}, {1, "rod"}};
+  if (path.empty()) return mp;
+
+  std::ifstream in(path);
+  if (!in.is_open()) return mp;
+
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    std::replace(line.begin(), line.end(), ':', ' ');
+    std::istringstream iss(line);
+    int id = -1;
+    std::string name;
+    if (iss >> id >> name) mp[id] = name;
+  }
+  return mp;
+}
+
+std::vector<demo::protocol::DetectionObject> loadYoloObjects(const std::string& txtPath,
+                                                            const std::map<int, std::string>& classMap,
+                                                            bool& ok) {
+  ok = false;
+  std::vector<demo::protocol::DetectionObject> out;
+  if (txtPath.empty()) return out;
+
+  std::ifstream in(txtPath);
+  if (!in.is_open()) return out;
+
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    std::istringstream iss(line);
+    int cls = -1;
+    double cx = 0, cy = 0, w = 0, h = 0, conf = 0;
+    if (!(iss >> cls >> cx >> cy >> w >> h >> conf)) continue;
+
+    demo::protocol::DetectionObject o;
+    auto it = classMap.find(cls);
+    o.label = (it == classMap.end()) ? ("cls_" + std::to_string(cls)) : it->second;
+    o.confidence = conf;
+    o.x = cx;
+    o.y = cy;
+    o.w = w;
+    o.h = h;
+    out.push_back(o);
+  }
+
+  ok = !out.empty();
+  return out;
+}
+} // namespace
 
 TcpSimServer::TcpSimServer(std::uint16_t port) : port_(port) {}
 
@@ -82,6 +142,8 @@ int TcpSimServer::run() {
       std::mt19937 rng{std::random_device{}()};
       std::uniform_int_distribution<int> shift(-30, 30);
 
+      const auto classMap = loadClassMap(cfg_.class_map_path);
+
       int seq = 0;
       while (running_) {
         const auto now_ms = demo::core::now_ms();
@@ -91,21 +153,30 @@ int TcpSimServer::run() {
         d.confidence = 0.95;
         d.source_ts_ms = now_ms - 15;
 
-        // 仅 person + rod；若给定固定参数则严格按固定参数发送
-        const bool fixed = cfg_.fixed;
-        const double personCx = fixed ? cfg_.person_cx : (0.36 + (seq % 6) * 0.015);
-        const double personCy = fixed ? cfg_.person_cy : 0.38;
-        const double personW = cfg_.person_w;
-        const double personH = cfg_.person_h;
-        const double rodCx = fixed ? cfg_.rod_cx : (personCx + 0.02);
-        const double rodCy = fixed ? cfg_.rod_cy : (personCy + 0.02);
+        bool yoloOk = false;
+        auto yoloObjects = loadYoloObjects(cfg_.yolo_txt_path, classMap, yoloOk);
 
-        const double personConf = cfg_.person_conf;
-        const double rodConf = cfg_.rod_conf;
-        demo::protocol::DetectionObject person{"person", personConf, personCx, personCy, personW, personH};
-        demo::protocol::DetectionObject rod{"rod", rodConf, rodCx, rodCy, cfg_.rod_w, cfg_.rod_h};
-        d.objects.push_back(person);
-        d.objects.push_back(rod);
+        if (yoloOk) {
+          d.label = "multi";
+          d.confidence = 1.0;
+          d.objects = std::move(yoloObjects);
+        } else {
+          // 仅 person + rod；若给定固定参数则严格按固定参数发送
+          const bool fixed = cfg_.fixed;
+          const double personCx = fixed ? cfg_.person_cx : (0.36 + (seq % 6) * 0.015);
+          const double personCy = fixed ? cfg_.person_cy : 0.38;
+          const double personW = cfg_.person_w;
+          const double personH = cfg_.person_h;
+          const double rodCx = fixed ? cfg_.rod_cx : (personCx + 0.02);
+          const double rodCy = fixed ? cfg_.rod_cy : (personCy + 0.02);
+
+          const double personConf = cfg_.person_conf;
+          const double rodConf = cfg_.rod_conf;
+          demo::protocol::DetectionObject person{"person", personConf, personCx, personCy, personW, personH};
+          demo::protocol::DetectionObject rod{"rod", rodConf, rodCx, rodCy, cfg_.rod_w, cfg_.rod_h};
+          d.objects.push_back(person);
+          d.objects.push_back(rod);
+        }
         demo::protocol::Gps g;
         g.time_usec = static_cast<std::int64_t>(now_ms) * 1000;
         g.lat_e7 = 311234567 + shift(rng);

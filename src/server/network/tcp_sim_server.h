@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <string>
 
 namespace demo::server {
 
@@ -19,6 +20,8 @@ public:
     double rod_cy = 0.40;
     double rod_w = 0.28;
     double rod_h = 0.13;
+    std::string yolo_txt_path;
+    std::string class_map_path;
   };
 
   explicit TcpSimServer(std::uint16_t port);

@@ -36,6 +36,8 @@ struct ServerOptions {
   double rod_cy = 0.40;
   double rod_w = 0.28;
   double rod_h = 0.13;
+  std::string yolo_txt;
+  std::string class_map;
 };
 
 struct SubsystemState {
@@ -68,6 +70,8 @@ void print_usage(const char* prog) {
             << "  --rod-conf <v>               Fixed rod confidence (default: 0.88)\n"
             << "  --person-cx/cy/w/h <v>       Person bbox normalized params\n"
             << "  --rod-cx/cy/w/h <v>          Rod bbox normalized params\n"
+            << "  --yolo-txt <path>            YOLO txt labels: cls cx cy w h conf (one per line)\n"
+            << "  --class-map <path>           Class map file, yaml-like: 0: person / 1: rod\n"
             << "  --help                       Show this help\n"
             << "\n"
             << "Compatibility (legacy positional):\n"
@@ -76,6 +80,7 @@ void print_usage(const char* prog) {
             << "  " << prog << " --tcp-port 9000 --video media/test.mp4\n"
             << "  " << prog << " --tcp-port 9000 --health-interval-sec 0\n"
             << "  " << prog << " --fixed-msg --person-conf 0.95 --rod-conf 0.85 --person-cx 0.40 --rod-cx 0.43\n"
+            << "  " << prog << " --yolo-txt labels/0004.txt --class-map labels/classes.yaml\n"
             << "  " << prog << " 9000 media/test.mp4\n";
 }
 
@@ -151,6 +156,8 @@ bool parse_options(int argc, char** argv, ServerOptions& opts) {
     if (arg == "--rod-cy") { if (i + 1 >= argc) return false; opts.rod_cy = std::stod(argv[++i]); saw_named = true; continue; }
     if (arg == "--rod-w") { if (i + 1 >= argc) return false; opts.rod_w = std::stod(argv[++i]); saw_named = true; continue; }
     if (arg == "--rod-h") { if (i + 1 >= argc) return false; opts.rod_h = std::stod(argv[++i]); saw_named = true; continue; }
+    if (arg == "--yolo-txt") { if (i + 1 >= argc) return false; opts.yolo_txt = argv[++i]; saw_named = true; continue; }
+    if (arg == "--class-map") { if (i + 1 >= argc) return false; opts.class_map = argv[++i]; saw_named = true; continue; }
 
     if (!arg.empty() && arg[0] == '-') return false;
     if (saw_named) return false;
@@ -199,6 +206,8 @@ void run_tcp_loop(ServerOptions opts) {
       cfg.rod_cy = opts.rod_cy;
       cfg.rod_w = opts.rod_w;
       cfg.rod_h = opts.rod_h;
+      cfg.yolo_txt_path = opts.yolo_txt;
+      cfg.class_map_path = opts.class_map;
       auto server = std::make_unique<demo::server::TcpSimServer>(opts.tcp_port, cfg);
       g_tcp_server = std::move(server);
       update_state(g_tcp_state, "RUNNING");
