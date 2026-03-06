@@ -6,7 +6,24 @@
 
 #include <QApplication>
 
+#include <iostream>
+#include <string>
+
 int main(int argc, char* argv[]) {
+  for (int i = 1; i < argc; ++i) {
+    const std::string arg = argv[i];
+    if (arg == "-h" || arg == "--help") {
+      std::cout << "qt_client 用法:\n"
+                << "  qt_client\n\n"
+                << "说明:\n"
+                << "  图形客户端程序，参数由界面和配置文件控制。\n\n"
+                << "示例:\n"
+                << "  ./qt_client\n";
+      return 0;
+    }
+
+  }
+
   QApplication app(argc, argv);
 
   qRegisterMetaType<demo::client::TelemetryPacket>("demo::client::TelemetryPacket");

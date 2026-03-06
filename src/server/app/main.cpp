@@ -54,7 +54,11 @@ void print_usage(const char* prog) {
             << "  --help                       Show this help\n"
             << "\n"
             << "Compatibility (legacy positional):\n"
-            << "  " << prog << " [tcp_port] [video_path]\n";
+            << "  " << prog << " [tcp_port] [video_path]\n\n"
+            << "Examples:\n"
+            << "  " << prog << " --tcp-port 9000 --video media/test.mp4\n"
+            << "  " << prog << " --tcp-port 9000 --health-interval-sec 0\n"
+            << "  " << prog << " 9000 media/test.mp4\n";
 }
 
 bool parse_options(int argc, char** argv, ServerOptions& opts) {
@@ -258,6 +262,14 @@ void print_health() {
 } // namespace
 
 int main(int argc, char** argv) {
+  for (int i = 1; i < argc; ++i) {
+    const std::string arg = argv[i];
+    if (arg == "--help" || arg == "-h") {
+      print_usage(argv[0]);
+      return 0;
+    }
+  }
+
   ServerOptions opts;
   try {
     if (!parse_options(argc, argv, opts)) {
