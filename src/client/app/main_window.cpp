@@ -305,7 +305,7 @@ void MainWindow::setupUi() {
   auto* rawLayout = new QVBoxLayout(rawGroup);
   recvDataView_ = new QPlainTextEdit(rawGroup);
   recvDataView_->setReadOnly(true);
-  recvDataView_->setMinimumHeight(170);
+  recvDataView_->setMinimumHeight(96);
   rawDetailBtn_ = new QPushButton("查看完整", rawGroup);
   connect(rawDetailBtn_, &QPushButton::clicked, this, &MainWindow::onShowRawDataDetail);
   rawLayout->addWidget(recvDataView_);
@@ -319,26 +319,39 @@ void MainWindow::setupUi() {
   alertLight_ = new QLabel(alertRow);
   alertLight_->setFixedSize(14, 14);
   setLampColor(alertLight_, "#334155");
-  alertStateLabel_ = new QLabel("person+rod/IoU 告警：idle", alertRow);
+  alertStateLabel_ = new QLabel("person + rod 告警：idle", alertRow);
+  alertStateLabel_->setStyleSheet("font-size:16px;font-weight:700;");
   alertLayout->addWidget(alertLight_);
   alertLayout->addWidget(alertStateLabel_, 1);
 
   gpsLabel_ = new QLabel("经纬度: --", parsedGroup);
-  gpsLabel_->setStyleSheet("font-size:14px;font-weight:700;");
+  gpsLabel_->setStyleSheet("font-size:16px;font-weight:700;");
   detectionSummaryLabel_ = new QLabel("检测摘要: --", parsedGroup);
   detectionSummaryLabel_->setWordWrap(true);
+  detectionSummaryLabel_->setStyleSheet("font-size:15px;");
 
-  parsedResultView_ = new QPlainTextEdit(parsedGroup);
-  parsedResultView_->setReadOnly(true);
-  parsedResultView_->setMinimumHeight(130);
+  parsedAlertLevelLabel_ = new QLabel("告警级别: --", parsedGroup);
+  parsedTriggerLabel_ = new QLabel("触发条件: --", parsedGroup);
+  parsedThresholdLabel_ = new QLabel("阈值: --", parsedGroup);
+  parsedTimeLabel_ = new QLabel("解析时间: --", parsedGroup);
+  parsedObjectsLabel_ = new QLabel("目标数量: --", parsedGroup);
+  for (auto* lb : {parsedAlertLevelLabel_, parsedTriggerLabel_, parsedThresholdLabel_, parsedTimeLabel_, parsedObjectsLabel_}) {
+    lb->setWordWrap(true);
+    lb->setStyleSheet("font-size:14px;");
+  }
 
   parsedLayout->addWidget(alertRow);
   parsedLayout->addWidget(gpsLabel_);
   parsedLayout->addWidget(detectionSummaryLabel_);
-  parsedLayout->addWidget(parsedResultView_);
+  parsedLayout->addWidget(parsedAlertLevelLabel_);
+  parsedLayout->addWidget(parsedTriggerLabel_);
+  parsedLayout->addWidget(parsedThresholdLabel_);
+  parsedLayout->addWidget(parsedTimeLabel_);
+  parsedLayout->addWidget(parsedObjectsLabel_);
+  parsedLayout->addStretch(1);
 
   dataLayout->addWidget(rawGroup, 1);
-  dataLayout->addWidget(parsedGroup, 1);
+  dataLayout->addWidget(parsedGroup, 3);
 
   auto* cfgGroup = new QGroupBox("参数编辑区", rightCol);
   auto* form = new QFormLayout(cfgGroup);
@@ -349,17 +362,11 @@ void MainWindow::setupUi() {
   reconnectSpin_ = new QSpinBox(cfgGroup);
   reconnectSpin_->setRange(500, 60000);
   reconnectSpin_->setSingleStep(500);
-  alertLowSpin_ = new QDoubleSpinBox(cfgGroup);
-  alertMidSpin_ = new QDoubleSpinBox(cfgGroup);
-  alertHighSpin_ = new QDoubleSpinBox(cfgGroup);
-  for (auto* spin : {alertLowSpin_, alertMidSpin_, alertHighSpin_}) {
-    spin->setRange(0.0, 1.0);
-    spin->setSingleStep(0.01);
-    spin->setDecimals(2);
-  }
-  alertLowSpin_->setValue(alertLowThreshold_);
-  alertMidSpin_->setValue(alertMidThreshold_);
-  alertHighSpin_->setValue(alertHighThreshold_);
+  alertThresholdSpin_ = new QDoubleSpinBox(cfgGroup);
+  alertThresholdSpin_->setRange(0.0, 1.0);
+  alertThresholdSpin_->setSingleStep(0.01);
+  alertThresholdSpin_->setDecimals(2);
+  alertThresholdSpin_->setValue(alertThreshold_);
   recordDirEdit_ = new QLineEdit(cfgGroup);
   recordEnabledCheck_ = new QCheckBox("启用录制", cfgGroup);
 
@@ -388,9 +395,7 @@ void MainWindow::setupUi() {
   form->addRow("TCP Host", tcpHostEdit_);
   form->addRow("TCP Port", tcpPortSpin_);
   form->addRow("重连间隔(ms)", reconnectSpin_);
-  form->addRow("告警低阈值", alertLowSpin_);
-  form->addRow("告警中阈值", alertMidSpin_);
-  form->addRow("告警高阈值", alertHighSpin_);
+  form->addRow("阈值", alertThresholdSpin_);
   form->addRow("录制路径", recordRow);
   form->addRow("录制开关", recordEnabledCheck_);
   form->addRow("控制", buttonRow);
@@ -645,25 +650,20 @@ void MainWindow::refreshParsedUi(const demo::client::TelemetryPacket& pkt) {
     if (lb == "rod") rodConf = qMax(rodConf, o.confidence);
   }
 
-  QString level = "无告警";
-  if (personConf >= alertHighThreshold_ && rodConf >= alertHighThreshold_) level = "高告警(红色)";
-  else if (personConf >= alertMidThreshold_ && rodConf >= alertMidThreshold_) level = "中告警(深黄)";
-  else if (personConf >= alertLowThreshold_ && rodConf >= alertLowThreshold_) level = "低告警(浅黄)";
+  const bool hit = personConf >= alertThreshold_ && rodConf >= alertThreshold_;
 
-  QStringList details;
-  details << QString("告警级别: %1").arg(level);
-  details << QString("触发条件: person_conf=%1, rod_conf=%2")
-                 .arg(personConf, 0, 'f', 2)
-                 .arg(rodConf, 0, 'f', 2);
-  details << QString("阈值 low/mid/high: %1 / %2 / %3")
-                 .arg(alertLowThreshold_, 0, 'f', 2)
-                 .arg(alertMidThreshold_, 0, 'f', 2)
-                 .arg(alertHighThreshold_, 0, 'f', 2);
+  if (parsedAlertLevelLabel_) parsedAlertLevelLabel_->setText(QString("告警级别: %1").arg(hit ? "触发" : "未触发"));
+  if (parsedTriggerLabel_) {
+    parsedTriggerLabel_->setText(QString("触发条件: person=%1, rod=%2")
+                                     .arg(personConf, 0, 'f', 2)
+                                     .arg(rodConf, 0, 'f', 2));
+  }
+  if (parsedThresholdLabel_) parsedThresholdLabel_->setText(QString("阈值: %1").arg(alertThreshold_, 0, 'f', 2));
   const auto t = QDateTime::fromMSecsSinceEpoch(pkt.recvTsMs).toString("HH:mm:ss");
-  details << QString("解析时间: %1").arg(t);
-  details << QString("objects: %1").arg(pkt.detection.objects.size());
-  parsedResultView_->setPlainText(details.join("\n"));
+  if (parsedTimeLabel_) parsedTimeLabel_->setText(QString("解析时间: %1").arg(t));
+  if (parsedObjectsLabel_) parsedObjectsLabel_->setText(QString("目标数量: %1").arg(pkt.detection.objects.size()));
 }
+
 
 QString MainWindow::saveScreenshotWithMetadata(const QString& reasonTag) {
   const QString dir = snapshotsDir_;
@@ -722,9 +722,7 @@ demo::client::AppConfig MainWindow::collectConfigFromUi() const {
   cfg.recordDir = toStoredRelativePath(resolvePath(recordDirEdit_->text().trimmed(), "./recordings"));
   cfg.recordEnabled = recordEnabledCheck_->isChecked();
   cfg.theme = config_.theme.isEmpty() ? "dark" : config_.theme;
-  cfg.alertLowThreshold = alertLowSpin_ ? alertLowSpin_->value() : alertLowThreshold_;
-  cfg.alertMidThreshold = alertMidSpin_ ? alertMidSpin_->value() : alertMidThreshold_;
-  cfg.alertHighThreshold = alertHighSpin_ ? alertHighSpin_->value() : alertHighThreshold_;
+  cfg.alertThreshold = alertThresholdSpin_ ? alertThresholdSpin_->value() : alertThreshold_;
   return cfg;
 }
 
@@ -736,12 +734,8 @@ void MainWindow::applyConfigToUi(const demo::client::AppConfig& cfg) {
   recordDirEdit_->setText(toStoredRelativePath(resolvePath(cfg.recordDir, "./recordings")));
   recordEnabledCheck_->setChecked(cfg.recordEnabled);
   config_.theme = cfg.theme.isEmpty() ? "dark" : cfg.theme;
-  alertLowThreshold_ = cfg.alertLowThreshold;
-  alertMidThreshold_ = cfg.alertMidThreshold;
-  alertHighThreshold_ = cfg.alertHighThreshold;
-  if (alertLowSpin_) alertLowSpin_->setValue(alertLowThreshold_);
-  if (alertMidSpin_) alertMidSpin_->setValue(alertMidThreshold_);
-  if (alertHighSpin_) alertHighSpin_->setValue(alertHighThreshold_);
+  alertThreshold_ = cfg.alertThreshold;
+  if (alertThresholdSpin_) alertThresholdSpin_->setValue(alertThreshold_);
   if (darkThemeAction_ && lightThemeAction_) {
     darkThemeAction_->setChecked(config_.theme != "light");
     lightThemeAction_->setChecked(config_.theme == "light");
@@ -816,27 +810,17 @@ void MainWindow::evaluatePersonRodAlert(const demo::client::TelemetryPacket& pkt
     if (lb == "rod") rodConf = qMax(rodConf, obj.confidence);
   }
 
-  const bool lowHit = personConf >= alertLowThreshold_ && rodConf >= alertLowThreshold_;
-  const bool midHit = personConf >= alertMidThreshold_ && rodConf >= alertMidThreshold_;
-  const bool highHit = personConf >= alertHighThreshold_ && rodConf >= alertHighThreshold_;
+  const bool hit = personConf >= alertThreshold_ && rodConf >= alertThreshold_;
 
-  alertActive_ = lowHit;
+  alertActive_ = hit;
   QString levelText = "idle";
-  if (highHit) {
+  if (hit) {
     setLampColor(alertLight_, "#ef4444");
-    levelText = "high";
-    if (alertStateLabel_) alertStateLabel_->setText(QString("告警：高(红) person=%1 rod=%2").arg(personConf, 0, 'f', 2).arg(rodConf, 0, 'f', 2));
-  } else if (midHit) {
-    setLampColor(alertLight_, "#f59e0b");
-    levelText = "mid";
-    if (alertStateLabel_) alertStateLabel_->setText(QString("告警：中(深黄) person=%1 rod=%2").arg(personConf, 0, 'f', 2).arg(rodConf, 0, 'f', 2));
-  } else if (lowHit) {
-    setLampColor(alertLight_, "#fde68a");
-    levelText = "low";
-    if (alertStateLabel_) alertStateLabel_->setText(QString("告警：低(浅黄) person=%1 rod=%2").arg(personConf, 0, 'f', 2).arg(rodConf, 0, 'f', 2));
+    levelText = "hit";
+    if (alertStateLabel_) alertStateLabel_->setText(QString("告警：触发 person=%1 rod=%2").arg(personConf, 0, 'f', 2).arg(rodConf, 0, 'f', 2));
   } else {
     setLampColor(alertLight_, "#334155");
-    if (alertStateLabel_) alertStateLabel_->setText("告警：idle（需同帧出现person与rod）");
+    if (alertStateLabel_) alertStateLabel_->setText("告警：未触发（需同帧出现person与rod）");
   }
 
   static QString lastLevel;

@@ -29,9 +29,9 @@ AppConfig AppRepository::loadConfig() {
   cfg.recordDir = settings_->value("record/dir", cfg.recordDir).toString();
   cfg.recordEnabled = settings_->value("record/enabled", cfg.recordEnabled).toBool();
   cfg.theme = settings_->value("view/theme", cfg.theme).toString();
-  cfg.alertLowThreshold = settings_->value("alert/low_threshold", cfg.alertLowThreshold).toDouble();
-  cfg.alertMidThreshold = settings_->value("alert/mid_threshold", cfg.alertMidThreshold).toDouble();
-  cfg.alertHighThreshold = settings_->value("alert/high_threshold", cfg.alertHighThreshold).toDouble();
+  cfg.alertThreshold = settings_->value("alert/threshold",
+                                       settings_->value("alert/high_threshold", cfg.alertThreshold))
+                           .toDouble();
   cfg.windowGeometry = settings_->value("view/window_geometry", cfg.windowGeometry).toByteArray();
   cfg.windowState = settings_->value("view/window_state", cfg.windowState).toByteArray();
 
@@ -46,9 +46,7 @@ void AppRepository::saveConfig(const AppConfig& cfg) {
   settings_->setValue("record/dir", cfg.recordDir);
   settings_->setValue("record/enabled", cfg.recordEnabled);
   settings_->setValue("view/theme", cfg.theme);
-  settings_->setValue("alert/low_threshold", cfg.alertLowThreshold);
-  settings_->setValue("alert/mid_threshold", cfg.alertMidThreshold);
-  settings_->setValue("alert/high_threshold", cfg.alertHighThreshold);
+  settings_->setValue("alert/threshold", cfg.alertThreshold);
   settings_->setValue("view/window_geometry", cfg.windowGeometry);
   settings_->setValue("view/window_state", cfg.windowState);
   settings_->sync();

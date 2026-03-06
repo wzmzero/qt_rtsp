@@ -15,9 +15,7 @@ struct AppConfig {
   QString recordDir{"./recordings"};
   bool recordEnabled{true};
   QString theme{"dark"};
-  double alertLowThreshold{0.50};
-  double alertMidThreshold{0.70};
-  double alertHighThreshold{0.85};
+  double alertThreshold{0.70};
   QByteArray windowGeometry;
   QByteArray windowState;
 };

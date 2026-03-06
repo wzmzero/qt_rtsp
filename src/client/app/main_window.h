@@ -92,16 +92,18 @@ private:
   QLabel* alertStateLabel_{nullptr};
   QLabel* gpsLabel_{nullptr};
   QLabel* detectionSummaryLabel_{nullptr};
+  QLabel* parsedAlertLevelLabel_{nullptr};
+  QLabel* parsedTriggerLabel_{nullptr};
+  QLabel* parsedThresholdLabel_{nullptr};
+  QLabel* parsedTimeLabel_{nullptr};
+  QLabel* parsedObjectsLabel_{nullptr};
   QPlainTextEdit* recvDataView_{nullptr};
-  QPlainTextEdit* parsedResultView_{nullptr};
 
   QLineEdit* rtspEdit_{nullptr};
   QLineEdit* tcpHostEdit_{nullptr};
   QSpinBox* tcpPortSpin_{nullptr};
   QSpinBox* reconnectSpin_{nullptr};
-  QDoubleSpinBox* alertLowSpin_{nullptr};
-  QDoubleSpinBox* alertMidSpin_{nullptr};
-  QDoubleSpinBox* alertHighSpin_{nullptr};
+  QDoubleSpinBox* alertThresholdSpin_{nullptr};
   QLineEdit* recordDirEdit_{nullptr};
   QCheckBox* recordEnabledCheck_{nullptr};
 
@@ -154,7 +156,5 @@ private:
   QString dbDisplayPath_;
   QString logFilePath_;
   bool alertActive_{false};
-  double alertLowThreshold_{0.50};
-  double alertMidThreshold_{0.70};
-  double alertHighThreshold_{0.85};
+  double alertThreshold_{0.70};
 };
