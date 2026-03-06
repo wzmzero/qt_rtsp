@@ -3,26 +3,47 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
-#include <QSqlError>
-#include <QSqlQuery>
+#include <QtSql/QSqlError>
+#include <QtSql/QSqlQuery>
+#include <QThread>
 #include <QVariant>
 
 namespace demo::client {
 
 SQLiteDatabaseService::SQLiteDatabaseService(const QString& dbPath, QObject* parent)
-    : QObject(parent), connName_(QString("qt_client_conn_%1").arg(reinterpret_cast<quintptr>(this))), dbPath_(dbPath) {}
+    : QObject(parent), dbPath_(dbPath) {}
 
 SQLiteDatabaseService::~SQLiteDatabaseService() {
   if (db_.isOpen()) db_.close();
-  if (QSqlDatabase::contains(connName_)) QSqlDatabase::removeDatabase(connName_);
+  const auto connName = db_.connectionName();
+  db_ = QSqlDatabase();
+  if (!connName.isEmpty() && QSqlDatabase::contains(connName)) {
+    QSqlDatabase::removeDatabase(connName);
+  }
+}
+
+QString SQLiteDatabaseService::connectionNameForCurrentThread() const {
+  return QString("qt_client_conn_%1").arg(reinterpret_cast<quintptr>(QThread::currentThreadId()));
 }
 
 bool SQLiteDatabaseService::ensureConnection() {
   if (db_.isValid() && db_.isOpen()) return true;
+
   QDir().mkpath(QFileInfo(dbPath_).absolutePath());
-  db_ = QSqlDatabase::addDatabase("QSQLITE", connName_);
-  db_.setDatabaseName(dbPath_);
-  return db_.open();
+
+  const auto connName = connectionNameForCurrentThread();
+  if (QSqlDatabase::contains(connName)) {
+    db_ = QSqlDatabase::database(connName);
+  } else {
+    db_ = QSqlDatabase::addDatabase("QSQLITE", connName);
+    db_.setDatabaseName(dbPath_);
+  }
+
+  if (!db_.isOpen() && !db_.open()) {
+    qWarning() << "SQLite open failed:" << db_.lastError().text();
+    return false;
+  }
+  return true;
 }
 
 bool SQLiteDatabaseService::initialize() {
@@ -32,14 +53,17 @@ bool SQLiteDatabaseService::initialize() {
 
 bool SQLiteDatabaseService::migrate() {
   QSqlQuery q(db_);
-  if (!q.exec("CREATE TABLE IF NOT EXISTS schema_version(version INTEGER NOT NULL);")) return false;
+  if (!q.exec("CREATE TABLE IF NOT EXISTS schema_version(version INTEGER NOT NULL);")) {
+    qWarning() << "Create schema_version failed:" << q.lastError().text();
+    return false;
+  }
 
   int version = 0;
   if (q.exec("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1;") && q.next()) {
     version = q.value(0).toInt();
   } else {
-    q.exec("DELETE FROM schema_version;");
-    q.exec("INSERT INTO schema_version(version) VALUES(0);");
+    if (!q.exec("DELETE FROM schema_version;")) return false;
+    if (!q.exec("INSERT INTO schema_version(version) VALUES(0);")) return false;
   }
 
   if (version < 1) {
@@ -47,18 +71,22 @@ bool SQLiteDatabaseService::migrate() {
                 "id INTEGER PRIMARY KEY CHECK(id=1),"
                 "rtsp_url TEXT NOT NULL, tcp_host TEXT NOT NULL, tcp_port INTEGER NOT NULL,"
                 "reconnect_ms INTEGER NOT NULL, record_dir TEXT NOT NULL, record_enabled INTEGER NOT NULL,"
-                "theme TEXT NOT NULL, window_geometry BLOB, window_state BLOB, updated_at_ms INTEGER NOT NULL);"))
+                "theme TEXT NOT NULL, window_geometry BLOB, window_state BLOB, updated_at_ms INTEGER NOT NULL);")) {
+      qWarning() << "Create app_config failed:" << q.lastError().text();
       return false;
+    }
 
     if (!q.exec("CREATE TABLE IF NOT EXISTS telemetry_results("
                 "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 "label TEXT, confidence REAL, source_ts_ms INTEGER, sent_ts_ms INTEGER, recv_ts_ms INTEGER,"
                 "gps_time_usec INTEGER, gps_lat_e7 INTEGER, gps_lon_e7 INTEGER, gps_alt_mm INTEGER,"
-                "gps_vel_cms INTEGER, gps_cog_cdeg INTEGER, gps_fix_type INTEGER, gps_satellites_visible INTEGER);"))
+                "gps_vel_cms INTEGER, gps_cog_cdeg INTEGER, gps_fix_type INTEGER, gps_satellites_visible INTEGER);")) {
+      qWarning() << "Create telemetry_results failed:" << q.lastError().text();
       return false;
+    }
 
-    q.exec("DELETE FROM schema_version;");
-    if (!q.exec("INSERT INTO schema_version(version) VALUES(1);") ) return false;
+    if (!q.exec("DELETE FROM schema_version;")) return false;
+    if (!q.exec("INSERT INTO schema_version(version) VALUES(1);")) return false;
   }
   return true;
 }
@@ -70,6 +98,7 @@ AppConfig SQLiteDatabaseService::loadConfig() {
   QSqlQuery q(db_);
   if (!q.exec("SELECT rtsp_url,tcp_host,tcp_port,reconnect_ms,record_dir,record_enabled,theme,window_geometry,window_state "
               "FROM app_config WHERE id=1 LIMIT 1;")) {
+    qWarning() << "Load config failed:" << q.lastError().text();
     return cfg;
   }
   if (!q.next()) return cfg;
@@ -101,7 +130,9 @@ void SQLiteDatabaseService::saveConfigAsync(const demo::client::AppConfig& cfg) 
   q.addBindValue(cfg.windowGeometry);
   q.addBindValue(cfg.windowState);
   q.addBindValue(QDateTime::currentMSecsSinceEpoch());
-  q.exec();
+  if (!q.exec()) {
+    qWarning() << "Save config failed:" << q.lastError().text();
+  }
 }
 
 void SQLiteDatabaseService::insertTelemetryAsync(const demo::client::TelemetryPacket& pkt) {
@@ -122,7 +153,9 @@ void SQLiteDatabaseService::insertTelemetryAsync(const demo::client::TelemetryPa
   q.addBindValue(pkt.gps.cogCdeg);
   q.addBindValue(pkt.gps.fixType);
   q.addBindValue(pkt.gps.satellitesVisible);
-  q.exec();
+  if (!q.exec()) {
+    qWarning() << "Insert telemetry failed:" << q.lastError().text();
+  }
 }
 
 } // namespace demo::client

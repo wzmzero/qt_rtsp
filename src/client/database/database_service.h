@@ -4,7 +4,7 @@
 #include "core/types.h"
 
 #include <QObject>
-#include <QSqlDatabase>
+#include <QtSql/QSqlDatabase>
 
 namespace demo::client {
 
@@ -31,7 +31,8 @@ public slots:
 private:
   bool ensureConnection();
   bool migrate();
-  QString connName_;
+  QString connectionNameForCurrentThread() const;
+
   QString dbPath_;
   QSqlDatabase db_;
 };

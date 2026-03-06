@@ -12,7 +12,15 @@ AppRepository::AppRepository(SQLiteDatabaseService* db, QSettings* settings, QOb
 
 AppConfig AppRepository::loadConfig() {
   AppConfig cfg;
-  if (db_) cfg = db_->loadConfig();
+
+  if (db_) {
+    QMetaObject::invokeMethod(
+        db_,
+        [&cfg, this]() {
+          cfg = db_->loadConfig();
+        },
+        Qt::BlockingQueuedConnection);
+  }
 
   cfg.rtspUrl = settings_->value("connection/rtsp_url", cfg.rtspUrl).toString();
   cfg.tcpHost = settings_->value("connection/tcp_host", cfg.tcpHost).toString();
