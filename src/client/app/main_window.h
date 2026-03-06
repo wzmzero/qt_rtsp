@@ -10,12 +10,18 @@
 QT_BEGIN_NAMESPACE
 class QCheckBox;
 class QComboBox;
+class QDateTimeEdit;
 class QLabel;
 class QLineEdit;
+class QListWidget;
 class QPlainTextEdit;
+class QPushButton;
 class QSpinBox;
+class QStackedWidget;
+class QTableWidget;
 class QVideoWidget;
 class QSettings;
+class QTimer;
 QT_END_NAMESPACE
 
 namespace demo::client {
@@ -38,8 +44,11 @@ private slots:
   void onSaveConfig();
   void onTelemetry(const demo::client::TelemetryPacket& pkt);
   void onFrame(const QVideoFrame& frame, qint64 tsMs);
-  void onLog(const QString& msg);
   void onConnectionStateChanged(const QString& state);
+  void onCaptureScreenshot();
+  void onRefreshEvents();
+  void onLogFilterChanged();
+  void blinkConnectionIndicator();
 
 private:
   void setupUi();
@@ -47,11 +56,25 @@ private:
   demo::client::AppConfig collectConfigFromUi() const;
   void applyConfigToUi(const demo::client::AppConfig& cfg);
   void applyTheme(const QString& theme);
+  void appendLog(const QString& level, const QString& type, const QString& msg);
+  void refreshLogView();
+  QString saveScreenshotWithMetadata(const QString& reasonTag);
+
+  struct LogEntry {
+    qint64 tsMs{0};
+    QString level;
+    QString type;
+    QString message;
+  };
+
+  QStackedWidget* pages_{nullptr};
 
   QLabel* connState_{nullptr};
+  QLabel* connLight_{nullptr};
   QLabel* tsLabel_{nullptr};
   QLabel* detectionLabel_{nullptr};
-  QLabel* gpsLabel_{nullptr};
+  QLabel* gpsRawLabel_{nullptr};
+  QLabel* gpsParsedLabel_{nullptr};
 
   QLineEdit* rtspEdit_{nullptr};
   QLineEdit* tcpHostEdit_{nullptr};
@@ -61,8 +84,22 @@ private:
   QCheckBox* recordEnabledCheck_{nullptr};
   QComboBox* themeCombo_{nullptr};
 
+  QComboBox* logLevelFilter_{nullptr};
+  QComboBox* logTypeFilter_{nullptr};
   QPlainTextEdit* logs_{nullptr};
+
+  QLineEdit* eventLabelFilter_{nullptr};
+  QDateTimeEdit* eventFrom_{nullptr};
+  QDateTimeEdit* eventTo_{nullptr};
+  QTableWidget* eventTable_{nullptr};
+
   QVideoWidget* videoWidget_{nullptr};
+  QPushButton* screenshotBtn_{nullptr};
+  QTimer* connBlinkTimer_{nullptr};
+  bool connBlinkOn_{false};
+  QString connStateValue_;
+
+  QList<LogEntry> logEntries_;
 
   QThread tcpThread_;
   QThread streamThread_;
@@ -78,4 +115,6 @@ private:
 
   demo::client::TelemetryPacket lastPkt_{};
   demo::client::AppConfig config_{};
+  QString dataDir_;
+  QString dbPath_;
 };

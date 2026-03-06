@@ -60,6 +60,16 @@ void RecordWorker::enqueue(const RecordItem& item) {
   }
   QTextStream ts(&f);
   ts << QJsonDocument(root).toJson(QJsonDocument::Compact) << '\n';
+
+  demo::client::PlaybackIndexRecord rec;
+  rec.frameTsMs = item.frameTsMs;
+  rec.wallTsMs = root["wall_ts_ms"].toInteger();
+  rec.metaPath = outDir_ + "/record_meta.jsonl";
+  rec.latencyMs = root["latency_ms"].toInteger();
+  rec.label = item.telemetry.detection.label;
+  rec.confidence = item.telemetry.detection.confidence;
+  emit playbackIndexed(rec);
 }
+
 
 } // namespace demo::client

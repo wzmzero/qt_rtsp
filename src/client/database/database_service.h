@@ -8,11 +8,28 @@
 
 namespace demo::client {
 
+struct EventRecord {
+  qint64 tsMs{0};
+  QString screenshotPath;
+  QString label;
+  double confidence{0.0};
+  bool isTargetEvent{false};
+};
+
 class IDatabaseService {
 public:
   virtual ~IDatabaseService() = default;
   virtual bool initialize() = 0;
   virtual AppConfig loadConfig() = 0;
+};
+
+struct PlaybackIndexRecord {
+  qint64 frameTsMs{0};
+  qint64 wallTsMs{0};
+  QString metaPath;
+  qint64 latencyMs{0};
+  QString label;
+  double confidence{0.0};
 };
 
 class SQLiteDatabaseService : public QObject, public IDatabaseService {
@@ -23,10 +40,17 @@ public:
 
   bool initialize() override;
   AppConfig loadConfig() override;
+  QString dbPath() const { return dbPath_; }
+
+  QList<EventRecord> queryEvents(const QString& label, qint64 fromMs, qint64 toMs, int limit);
 
 public slots:
   void saveConfigAsync(const demo::client::AppConfig& cfg);
   void insertTelemetryAsync(const demo::client::TelemetryPacket& pkt);
+  void insertSnapshotEventAsync(const demo::client::TelemetryPacket& pkt, const QString& screenshotPath,
+                                const QString& reasonTag, bool isTargetEvent);
+  void insertAppLogAsync(qint64 tsMs, const QString& level, const QString& type, const QString& message);
+  void insertPlaybackIndexAsync(const demo::client::PlaybackIndexRecord& rec);
 
 private:
   bool ensureConnection();
@@ -38,3 +62,8 @@ private:
 };
 
 } // namespace demo::client
+
+Q_DECLARE_METATYPE(demo::client::EventRecord)
+Q_DECLARE_METATYPE(QList<demo::client::EventRecord>)
+
+Q_DECLARE_METATYPE(demo::client::PlaybackIndexRecord)

@@ -1,6 +1,7 @@
 #include "app/main_window.h"
 #include "core/app_config.h"
 #include "core/types.h"
+#include "database/database_service.h"
 #include "media/record_worker.h"
 
 #include <QApplication>
@@ -12,6 +13,7 @@ int main(int argc, char* argv[]) {
   qRegisterMetaType<demo::client::RecordItem>("demo::client::RecordItem");
   qRegisterMetaType<demo::client::AppConfig>("demo::client::AppConfig");
   qRegisterMetaType<QVideoFrame>("QVideoFrame");
+  qRegisterMetaType<demo::client::PlaybackIndexRecord>("demo::client::PlaybackIndexRecord");
 
   MainWindow w;
   w.show();

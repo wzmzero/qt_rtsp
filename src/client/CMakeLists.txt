@@ -13,6 +13,7 @@ add_executable(qt_client
   media/record_worker.cpp
   database/database_service.cpp
   repository/app_repository.cpp
+  resources/resources.qrc
 )
 
 target_include_directories(qt_client PRIVATE

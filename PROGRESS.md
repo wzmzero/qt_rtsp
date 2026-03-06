@@ -1,81 +1,62 @@
 # PROGRESS
 
-## 2026-03-06（服务端一体化：sim_server 自动推流 + TCP 并行）
+## 2026-03-06（产品化改造收尾）
 
-### 目标
-1. `sim_server` 启动时自动拉起推流进程（默认 `media/test.mp4 -> rtsp://127.0.0.1:8554/live`）。
-2. 去掉“手动终端 C”要求，保留视频路径/RTSP URL/ffmpeg 路径可配置。
-3. 服务端仅使用标准库/系统调用，不引入 Qt 依赖。
-4. 推流失败时给出明确错误，并支持失败策略配置（继续 TCP 或直接退出）。
-5. 更新文档，给出新启动流程（A+B+D），并完成 configure/build 验证。
+### 本轮目标
+- 数据库从“两大表”修正为“按功能分表”。
+- 提供 `schema_version` 迁移逻辑，兼容已有库升级。
+- 保持多页面 UI 与参数区职责边界。
+- 完成截图事件入库、日志筛选基础能力、GPS 原始+解析显示。
+- 更新文档并完成可编译可运行验证。
 
-### 实施内容
+### 已完成
+1. **数据库重构（v3）**
+   - 新/保留表：
+     - `app_config`
+     - `telemetry_results`
+     - `gps_samples`
+     - `snapshot_events`
+     - `app_logs`
+     - `playback_index`
+     - `schema_version`
+   - `schema_version` 标准化为 `(version, applied_at_ms)`。
 
-#### 1) RTSP 推流进程管理（server 侧）
-- 重构 `RtspLauncher`：由“仅打印命令”升级为真正的进程管理器。
-- 新增能力：
-  - `start()`：通过 `fork + execvp` 启动 ffmpeg 推流进程。
-  - `stop()`：通过 `SIGTERM` + `waitpid` 联动停止；超时后 `SIGKILL` 兜底。
-  - `ffmpeg_command()`：用于日志打印实际启动命令。
-- 启动健壮性：
-  - 启动后短窗口内轮询 `waitpid(WNOHANG)`，检测 ffmpeg 是否“秒退”。
-  - 秒退时输出明确错误（退出码/信号 + 路径配置提示）。
+2. **迁移逻辑**
+   - 兼容旧 `schema_version(version)` 单列结构，自动标准化。
+   - 兼容旧 `telemetry_objects`，迁移到：
+     - `telemetry_results`（检测信息）
+     - `gps_samples`（GPS 原始+解析）
+     - `snapshot_events`（截图/目标事件）
+   - 迁移后写入 `schema_version=3` 并删除旧 `telemetry_objects`。
 
-#### 2) sim_server 参数与策略
-- 新增命令行参数：
-  - `--tcp-port <port>`（默认 9000）
-  - `--video <path>`（默认 `media/test.mp4`）
-  - `--rtsp-url <url>`（默认 `rtsp://127.0.0.1:8554/live`）
-  - `--ffmpeg <path>`（默认 `ffmpeg`）
-  - `--require-rtsp`（推流失败即退出）
-- 默认策略：推流失败打印 WARN，TCP 模拟服务继续运行。
-- 严格策略：`--require-rtsp` 下，推流失败返回非零退出。
-- 保留旧兼容位置参数：`sim_server [tcp_port] [video_path]`。
+3. **UI 架构与交互（保持并补齐）**
+   - 维持 `实时/回放/日志/事件` 四页结构。
+   - 菜单负责切页；参数区保留启动/停止/保存配置。
+   - 保存配置成功弹窗已生效；主题保存后即时生效。
+   - 主窗口保留拖动、缩放行为（未固定尺寸，设置最小尺寸保障可用性）。
 
-#### 3) 生命周期联动
-- `SIGINT/SIGTERM` 时同时触发：
-  - TCP 服务 `stop()`
-  - RTSP 推流 `stop()`
-- 主循环退出后再次执行 RTSP 停止，确保回收子进程。
+4. **功能闭环**
+   - 截图事件写入 `snapshot_events`（含 reasonTag、目标事件标记）。
+   - 日志筛选保留（级别/类型），并新增落库到 `app_logs`。
+   - GPS 同时展示原始 E7 + 解析度数；入库至 `gps_samples`。
+   - 录制抽样时写入 `playback_index`。
 
-#### 4) 文档更新
-- `README.md` 更新为新流程：A+B+D（不再需要手动终端 C）。
-- 增补参数说明、默认值、失败策略说明、运行示例与兼容性说明。
+5. **构建/运行验证**
+   - `cmake -S . -B build && cmake --build build -j4` 通过。
+   - `QT_QPA_PLATFORM=offscreen` 启动客户端 5 秒冒烟验证通过。
 
 ### 变更文件
-- `src/server/media/rtsp_launcher.h`
-- `src/server/media/rtsp_launcher.cpp`
-- `src/server/app/main.cpp`
+- `src/client/database/database_service.h`
+- `src/client/database/database_service.cpp`
+- `src/client/repository/app_repository.cpp`
+- `src/client/media/record_worker.h`
+- `src/client/media/record_worker.cpp`
+- `src/client/app/main_window.cpp`
+- `src/client/app/main.cpp`
 - `README.md`
 - `PROGRESS.md`
 
-### Configure / Build 验证
-执行：
-```bash
-cmake -S . -B build
-cmake --build build -j4
-```
-
-结果：通过。
-
-### 运行示例
-
-```bash
-# 默认（自动推流 + TCP）
-./build/src/server/sim_server
-
-# 自定义视频/RTSP/ffmpeg
-./build/src/server/sim_server \
-  --tcp-port 9100 \
-  --video media/test.mp4 \
-  --rtsp-url rtsp://127.0.0.1:8554/live \
-  --ffmpeg /usr/bin/ffmpeg
-
-# 推流失败即退出
-./build/src/server/sim_server --require-rtsp
-```
-
 ### 已知限制
-1. 进程管理基于 POSIX 系统调用（Windows 原生需额外适配）。
-2. “启动成功”判定为“未在短时间内秒退”，不等价于 RTSP 链路已被下游成功消费。
-3. 当前未做 ffmpeg stdout/stderr 管道采集，细节日志由 ffmpeg 进程直接输出到控制台。
+1. 回放页仍为功能占位，尚未实现播放器列表/时间轴 UI。
+2. `insertSnapshotEventAsync` 当前会额外插入一条 telemetry+gps（用于保证事件关联），后续可引入去重策略。
+3. 事件目标规则目前仍是 `label == person`（可配置化待后续迭代）。

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/types.h"
+#include "database/database_service.h"
 
 #include <QObject>
 #include <QVideoFrame>
@@ -25,6 +26,7 @@ public slots:
 
 signals:
   void logMessage(const QString& msg);
+  void playbackIndexed(const demo::client::PlaybackIndexRecord& rec);
 
 private:
   bool running_{false};
