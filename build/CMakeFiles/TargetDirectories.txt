@@ -1,0 +1,12 @@
+/home/wzm/qt_rtsp_tcp_project/build/CMakeFiles/edit_cache.dir
+/home/wzm/qt_rtsp_tcp_project/build/CMakeFiles/rebuild_cache.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/common/CMakeFiles/edit_cache.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/common/CMakeFiles/rebuild_cache.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/server/CMakeFiles/sim_server.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/server/CMakeFiles/edit_cache.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/server/CMakeFiles/rebuild_cache.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/client/CMakeFiles/qt_client.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/client/CMakeFiles/edit_cache.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/client/CMakeFiles/rebuild_cache.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/client/CMakeFiles/qt_client_autogen_timestamp_deps.dir
+/home/wzm/qt_rtsp_tcp_project/build/src/client/CMakeFiles/qt_client_autogen.dir
