@@ -114,3 +114,9 @@
 2026-03-06 16:36:40.125 [INFO] [app] Workers stopped
 2026-03-06 16:36:42.289 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
 2026-03-06 16:43:34.250 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 17:18:12.823 [INFO] [event] 截图保存: /home/wzm/qt_rtsp_tcp_project/./snapshots/shot_1772788692821_manual.jpg
+2026-03-06 17:19:14.608 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 17:21:03.442 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 17:21:34.967 [INFO] [event] 事件查询完成: 0 条
+2026-03-06 17:24:54.036 [INFO] [app] Workers stopped
+2026-03-06 17:25:23.384 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
