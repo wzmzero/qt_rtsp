@@ -2,56 +2,41 @@ syntax = "proto3";
 
 package demo.msg;
 
-// 单个检测目标（YOLO 标准化框）
-// label_id: 类别ID（建议 0=person, 1=rod；可通过 class-map 自定义）
-// label: 类别名称（用于显示与日志）
-// confidence: 目标置信度 [0,1]
-// cx,cy,w,h: 归一化中心点与宽高（范围通常 [0,1]）
 message DetectionObject {
-  int32 label_id = 1;
-  string label = 2;
-  double confidence = 3;
-  double cx = 4;
-  double cy = 5;
-  double w = 6;
-  double h = 7;
+  int32 label_id = 1;      // 类别ID（建议 0=person, 1=rod；可映射）
+  string label = 2;        // 类别名称（如 "person" / "rod"）
+  double confidence = 3;   // 目标置信度 [0,1]
+  double cx = 4;           // 目标框中心点 x（归一化）
+  double cy = 5;           // 目标框中心点 y（归一化）
+  double w = 6;            // 目标框宽度（归一化）
+  double h = 7;            // 目标框高度（归一化）
 }
 
-// 检测结果容器（支持多目标）
-// label/confidence: 可作为整帧摘要；实际目标请看 objects
-// source_ts_ms: 检测算法生成时间（毫秒）
 message Detection {
-  string label = 1;
-  double confidence = 2;
-  int64 source_ts_ms = 3;
-  repeated DetectionObject objects = 4;
+  string label = 1;                    // 整帧检测摘要标签（可用 "multi"）
+  double confidence = 2;               // 整帧检测摘要置信度
+  int64 source_ts_ms = 3;              // 检测算法输出时间戳（毫秒）
+  repeated DetectionObject objects = 4;// 多目标检测结果列表
 }
 
-// GPS 数据（与检测同帧传输）
-// lat/lon 使用 E7 整型格式：真实值 = e7 / 1e7
 message Gps {
-  int64 time_usec = 1;
-  int32 lat_e7 = 2;
-  int32 lon_e7 = 3;
-  int32 alt_mm = 4;
-  int32 eph_cm = 5;
-  int32 epv_cm = 6;
-  int32 vel_cms = 7;
-  int32 cog_cdeg = 8;
-  uint32 fix_type = 9;
-  uint32 satellites_visible = 10;
+  int64 time_usec = 1;          // GPS 时间戳（微秒）
+  int32 lat_e7 = 2;             // 纬度 E7（真实值=lat_e7/1e7）
+  int32 lon_e7 = 3;             // 经度 E7（真实值=lon_e7/1e7）
+  int32 alt_mm = 4;             // 海拔（毫米）
+  int32 eph_cm = 5;             // 水平精度估计（厘米）
+  int32 epv_cm = 6;             // 垂直精度估计（厘米）
+  int32 vel_cms = 7;            // 地速（厘米/秒）
+  int32 cog_cdeg = 8;           // 航向（0.01度）
+  uint32 fix_type = 9;          // 定位类型（如 3=3D fix）
+  uint32 satellites_visible = 10;// 可见卫星数
 }
 
-// TCP 传输主消息（建议使用 length-prefix framing）
-// type: 消息类型，当前固定为 "telemetry"
-// version: 协议版本（后续升级时用于兼容）
-// seq: 序列号（发送端递增）
-// sent_ts_ms: 发送时间戳（毫秒）
 message Telemetry {
-  string type = 1;
-  uint32 version = 2;
-  uint64 seq = 3;
-  int64 sent_ts_ms = 4;
-  Detection detection = 5;
-  Gps gps = 6;
+  string type = 1;      // 消息类型（当前固定 "telemetry"）
+  uint32 version = 2;   // 协议版本（用于兼容升级）
+  uint64 seq = 3;       // 序列号（发送端递增）
+  int64 sent_ts_ms = 4; // 发送时间戳（毫秒）
+  Detection detection = 5; // 检测结果结构
+  Gps gps = 6;          // GPS 数据结构
 }
