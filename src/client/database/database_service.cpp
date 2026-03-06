@@ -53,19 +53,19 @@ qint64 persistTelemetryPacket(QSqlDatabase& db, const demo::client::TelemetryPac
   }
 
   QSqlQuery g(db);
-  g.prepare("INSERT INTO gps(telemetry_id,time_usec,lat_e7,lon_e7,alt_mm,vel_cms,cog_cdeg,fix_type,satellites_visible,lat_deg,lon_deg) "
+  g.prepare("INSERT INTO gps(telemetry_id,time_usec,lat_e7,lon_e7,alt_mm,eph_cm,epv_cm,vel_cms,cog_cdeg,fix_type,satellites_visible) "
             "VALUES(?,?,?,?,?,?,?,?,?,?,?);");
   g.addBindValue(telemetryId);
   g.addBindValue(pkt.gps.timeUsec);
   g.addBindValue(pkt.gps.latE7);
   g.addBindValue(pkt.gps.lonE7);
   g.addBindValue(pkt.gps.altMm);
+  g.addBindValue(0);
+  g.addBindValue(0);
   g.addBindValue(pkt.gps.velCms);
   g.addBindValue(pkt.gps.cogCdeg);
   g.addBindValue(pkt.gps.fixType);
   g.addBindValue(pkt.gps.satellitesVisible);
-  g.addBindValue(static_cast<double>(pkt.gps.latE7) / 10000000.0);
-  g.addBindValue(static_cast<double>(pkt.gps.lonE7) / 10000000.0);
   if (!g.exec()) {
     qWarning() << "Insert gps failed:" << g.lastError().text();
   }
@@ -213,8 +213,8 @@ bool SQLiteDatabaseService::migrate() {
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
               "telemetry_id INTEGER NOT NULL UNIQUE,"
               "time_usec INTEGER, lat_e7 INTEGER, lon_e7 INTEGER, alt_mm INTEGER,"
-              "vel_cms INTEGER, cog_cdeg INTEGER, fix_type INTEGER, satellites_visible INTEGER,"
-              "lat_deg REAL, lon_deg REAL,"
+              "eph_cm INTEGER, epv_cm INTEGER, vel_cms INTEGER, cog_cdeg INTEGER,"
+              "fix_type INTEGER, satellites_visible INTEGER,"
               "FOREIGN KEY(telemetry_id) REFERENCES telemetry(id));")) {
     qWarning() << "Create gps failed:" << q.lastError().text();
     return false;
@@ -327,6 +327,18 @@ bool SQLiteDatabaseService::migrate() {
   if (!hasSnapshotBlobCol) {
     q.exec("ALTER TABLE snapshot_events ADD COLUMN screenshot_blob BLOB;");
   }
+
+  bool hasEph = false;
+  bool hasEpv = false;
+  if (q.exec("PRAGMA table_info(gps);") ) {
+    while (q.next()) {
+      const auto c = q.value(1).toString();
+      if (c == "eph_cm") hasEph = true;
+      if (c == "epv_cm") hasEpv = true;
+    }
+  }
+  if (!hasEph) q.exec("ALTER TABLE gps ADD COLUMN eph_cm INTEGER DEFAULT 0;");
+  if (!hasEpv) q.exec("ALTER TABLE gps ADD COLUMN epv_cm INTEGER DEFAULT 0;");
 
   return true;
 }
@@ -445,7 +457,7 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
   if (!ensureConnection()) return items;
 
   QString sql = "SELECT se.event_ts_ms, se.screenshot_path, se.screenshot_blob, se.label, se.confidence, se.is_target_event, "
-                "IFNULL(gm.lat_deg,0), IFNULL(gm.lon_deg,0), "
+                "IFNULL(CAST(gm.lat_e7 AS REAL)/10000000.0,0), IFNULL(CAST(gm.lon_e7 AS REAL)/10000000.0,0), "
                 "IFNULL((SELECT GROUP_CONCAT(printf('%s:[%.2f,%.2f,%.2f,%.2f]', do.label, do.cx, do.cy, do.w, do.h), ' | ') "
                 "        FROM detection_object do WHERE do.telemetry_id = se.telemetry_id ORDER BY do.obj_index LIMIT 2), '') "
                 "FROM snapshot_events se "
