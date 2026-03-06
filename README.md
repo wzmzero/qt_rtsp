@@ -1,42 +1,58 @@
 # qt_rtsp_tcp_project
 
-一个最小可运行的 **RTSP 视频 + TCP 遥测** 联动示例：
+Qt6 客户端 + C++ 模拟服务端示例，支持 RTSP 视频与 TCP 遥测融合展示，并完成了 **UI 升级 + 可配置化 + SQLite 持久化**。
 
-- `sim_server`（C++）：
-  - 按 1Hz 在 TCP 端口推送 JSON telemetry（检测结果 + GPS）
-  - 打印 FFmpeg 命令提示，便于将本地视频循环推送到 RTSP
-- `qt_client`（Qt6）：
-  - 独立线程接收 TCP telemetry
-  - 独立线程拉取 RTSP 视频
-  - 独立线程记录抽样后的融合元数据 `jsonl`
-  - UI 显示实时状态、遥测摘要、视频画面与日志
+## 主要能力
 
-## 目录结构
+- 三线程解耦（TCP / RTSP / Record）+ UI 编排线程
+- 新增数据库线程（SQLite + QtSql）用于配置与结果持久化
+- 可配置参数（界面可改 + 持久化）：
+  - RTSP URL
+  - TCP Host / Port
+  - TCP 重连间隔
+  - 录制目录 / 录制开关
+  - 主题、窗口布局
+- UI 重构：
+  - 顶部菜单栏（文件/连接/视图/帮助）
+  - 工具栏（启动/停止/保存配置）
+  - 主视频区域居中且占主区域
+  - 配置 GroupBox + 底部日志 + 状态面板（连接状态/时间戳/检测/GPS）
+
+## 架构分层
 
 ```text
-src/
-  common/                # 跨端公共协议与工具
-  server/                # sim_server
-  client/
-    app/                 # Qt UI 入口与主窗口
-    network/             # TcpClientWorker
-    media/               # StreamWorker / RecordWorker
-    core/                # 客户端类型定义
+src/client/
+  app/                  # MainWindow(UI编排)
+  core/                 # DTO + AppConfig
+  network/              # TcpClientWorker (含重连)
+  media/                # StreamWorker / RecordWorker
+  database/             # IDatabaseService + SQLiteDatabaseService
+  repository/           # IAppRepository + AppRepository
 ```
+
+- **UI 不直接操作 SQL**，通过 Repository -> DatabaseService 抽象访问。
+- **数据库写入异步化**：配置保存与 telemetry 入库通过 `QueuedConnection` 投递到 DB 线程，避免阻塞 UI。
+
+## SQLite Schema（v1）
+
+- `schema_version(version)`
+- `app_config`
+  - `rtsp_url, tcp_host, tcp_port, reconnect_ms, record_dir, record_enabled, theme, window_geometry, window_state, updated_at_ms`
+- `telemetry_results`
+  - `label, confidence, source_ts_ms, sent_ts_ms, recv_ts_ms`
+  - `gps_time_usec, gps_lat_e7, gps_lon_e7, gps_alt_mm, gps_vel_cms, gps_cog_cdeg, gps_fix_type, gps_satellites_visible`
+
+数据库文件默认位置：
+- Linux: `~/.local/share/qt_client/client_data.sqlite`
 
 ## 构建
 
 ```bash
 cmake -S . -B build
-cmake --build build -j
+cmake --build build -j4
 ```
 
-产物：
-
-- `build/src/server/sim_server`
-- `build/src/client/qt_client`
-
-## 运行示例
+## 运行
 
 ### 1) 启动模拟服务端
 
@@ -44,38 +60,18 @@ cmake --build build -j
 ./build/src/server/sim_server 9000 sample.mp4
 ```
 
-服务端会打印 RTSP 推流建议命令（手动执行）：
-
-```bash
-ffmpeg -re -stream_loop -1 -i "sample.mp4" -an -c:v libx264 -preset veryfast -tune zerolatency \
-  -f rtsp -rtsp_transport tcp "rtsp://127.0.0.1:8554/live"
-```
-
-> 需本地有可用 RTSP 服务（例如 mediamtx）监听 `:8554`。
-
-### 2) 启动 Qt 客户端
+### 2) 启动客户端
 
 ```bash
 ./build/src/client/qt_client
 ```
 
-点击 **Start** 后默认连接：
+在 UI 中修改参数并点击“保存配置”，会同时写入：
+- QSettings（快速本地配置）
+- SQLite（结构化配置 + 可扩展查询）
 
-- TCP: `127.0.0.1:9000`
-- RTSP: `rtsp://127.0.0.1:8554/live`
+## 已知限制
 
-## 记录输出
-
-客户端记录线程会抽样将融合元数据写到：
-
-- `~/.local/share/qt_client/records/record_meta.jsonl`（Linux 默认）
-
-字段包含：帧时间戳、是否有效帧、遥测延迟估计、检测信息、GPS 信息。
-
-## 线程/模块解耦说明
-
-- UI 线程仅负责展示与控制
-- `TcpClientWorker`、`StreamWorker`、`RecordWorker` 分别运行在独立 `QThread`
-- 线程间通过 Qt 信号槽 + `QueuedConnection` 传递数据
-- 自定义跨线程消息 `TelemetryPacket` / `RecordItem` 通过 `Q_DECLARE_METATYPE + qRegisterMetaType` 注册
-
+1. 当前仅实现最小迁移入口（`schema_version` + v1 建表），未实现多版本自动回滚策略。
+2. `StreamWorker` 未实现 RTSP 自动重连状态机（TCP 已支持重连）。
+3. RecordWorker 当前落盘为抽样 JSONL 元数据，未做完整视频编码归档。

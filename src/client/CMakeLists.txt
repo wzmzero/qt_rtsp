@@ -1,4 +1,4 @@
-find_package(Qt6 QUIET COMPONENTS Core Widgets Network Multimedia MultimediaWidgets)
+find_package(Qt6 QUIET COMPONENTS Core Widgets Network Multimedia MultimediaWidgets Sql)
 
 if(NOT Qt6_FOUND)
   message(WARNING "Qt6 not found, skip building qt_client")
@@ -11,6 +11,8 @@ add_executable(qt_client
   network/tcp_client_worker.cpp
   media/stream_worker.cpp
   media/record_worker.cpp
+  database/database_service.cpp
+  repository/app_repository.cpp
 )
 
 target_include_directories(qt_client PRIVATE
@@ -19,5 +21,5 @@ target_include_directories(qt_client PRIVATE
 
 target_link_libraries(qt_client PRIVATE
   project_common
-  Qt6::Core Qt6::Widgets Qt6::Network Qt6::Multimedia Qt6::MultimediaWidgets
+  Qt6::Core Qt6::Widgets Qt6::Network Qt6::Multimedia Qt6::MultimediaWidgets Qt6::Sql
 )

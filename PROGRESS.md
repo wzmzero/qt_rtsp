@@ -1,85 +1,84 @@
 # PROGRESS
 
-## 2026-03-06
+## 2026-03-06（UI升级 + 可配置化 + 数据库接口层）
 
-### 本轮目标
-- 补齐 Qt 客户端关键源码：
-  - `src/client/app/main.cpp`
-  - `src/client/app/main_window.cpp`
-  - `src/client/network/tcp_client_worker.*`（沿用并对接）
-  - `src/client/media/stream_worker.*`（沿用并对接）
-  - `src/client/media/record_worker.*`（增强记录）
-- 完成文档：`README.md`、`PROGRESS.md`
-- 保持模块化分层与多线程解耦
-- 执行 configure/build 验证
+### 任务目标
+1. Qt 客户端 UI 完整重构与美化。
+2. 参数可配置并持久化（QSettings + SQLite）。
+3. 新增 DatabaseService/Repository 抽象，UI 不直接写 SQL。
+4. 新增检测结果/GPS 持久化。
+5. 建立 schema_version + 初始化迁移入口。
+6. 维持线程解耦，数据库写入不阻塞 UI。
+7. 完成 configure/build 验证并提交。
 
-### 已完成
-1. **Qt 客户端入口与窗口实现**
-   - 新增 `app/main.cpp`，完成 `QApplication` 启动与 metatype 注册。
-   - 新增 `app/main_window.cpp`，完成：
-     - UI 组件搭建（状态、遥测摘要、视频、日志、Start/Stop）
-     - 三个 worker 的线程化生命周期管理
-     - Start/Stop 控制链路
-     - telemetry 与 frame 合流并投递给记录线程
+### 实施阶段
 
-2. **数据类型与记录模块增强**
-   - `core/types.h` 增加 `Q_DECLARE_METATYPE(TelemetryPacket)`。
-   - `media/record_worker.h` 增加 `Q_DECLARE_METATYPE(RecordItem)`。
-   - `media/record_worker.cpp` 从简单文本占位升级为 `record_meta.jsonl` 抽样记录（每 15 帧），并输出延迟估计/检测/GPS字段。
+#### 阶段A：配置对象与基础重构
+- 新增 `core/app_config.h`：统一配置 DTO（RTSP/TCP/重连/录制/主题/窗口布局）。
+- MainWindow 改为基于配置对象启动 worker。
 
-3. **文档补齐**
-   - 新增 `README.md`：项目说明、构建运行步骤、目录结构、线程解耦说明。
-   - 新增 `PROGRESS.md`：记录本次开发、构建问题与修复。
+#### 阶段B：数据库接口层
+- 新增 `database/database_service.*`
+  - `IDatabaseService` 抽象
+  - `SQLiteDatabaseService` 实现
+  - `initialize()` + `migrate()`（v1）
+  - `loadConfig()` / `saveConfigAsync()` / `insertTelemetryAsync()`
+- 新增 `repository/app_repository.*`
+  - `IAppRepository` 抽象
+  - `AppRepository` 实现
+  - QSettings 与 SQLite 双写配置
+  - telemetry 异步入库
 
-### Configure / Build 结果
-执行：
+#### 阶段C：UI升级与可配置化
+- `main_window.*` 重写：
+  - 顶部菜单栏（文件/连接/视图/帮助）
+  - ToolBar + StatusBar
+  - GroupBox 分区布局
+  - 视频主区域居中、占主要空间
+  - 状态面板显示连接状态/时间戳/检测/GPS
+  - 样式表支持 dark/light 主题
+- 参数输入：RTSP、TCP Host/Port、重连间隔、录制目录/开关、主题
 
+#### 阶段D：线程解耦增强
+- 保持 `TcpClientWorker` / `StreamWorker` / `RecordWorker` 独立线程。
+- 新增 `dbThread`，数据库写入全部 `QueuedConnection` 投递。
+- UI 线程仅负责状态编排与展示。
+- `TcpClientWorker` 增加断线重连（可配置重连间隔）。
+
+### 构建错误与修复
+1. **首次 build 大量 Qt Core 头文件级联错误（`qcompare.h`）**
+   - 根因：`core/app_config.h` 使用 `Q_DECLARE_METATYPE` 但缺少 `QMetaType` / `QtGlobal` 相关包含，导致 MOC/编译期语义异常。
+   - 修复：在 `app_config.h` 增加 `#include <QMetaType>` 与 `#include <QtGlobal>`。
+
+2. **`QCheckBox/QComboBox` 不完整类型报错**
+   - 根因：`main_window.cpp` 中使用了成员函数，但未包含完整头文件。
+   - 修复：补充 `#include <QCheckBox>`、`#include <QComboBox>`。
+
+### Configure / Build 验证
+执行命令：
 ```bash
 cmake -S . -B build
 cmake --build build -j4
 ```
 
-- Configure：成功。
+结果：
+- Configure：成功（存在 server 目标 AUTOGEN dev warning，不影响构建）。
 - Build：首次失败后修复，最终成功。
+- 产物：
+  - `build/src/server/sim_server`
+  - `build/src/client/qt_client`
 
-### 构建错误与修复
-**错误现象（首次 build）**
-- `main_window.h` 中 `QVideoFrame` 未声明导致 MOC/编译阶段报错：
-  - `‘QVideoFrame’ does not name a type`
-  - 信号槽参数推导错误，出现 `const int&` 的级联报错。
-
-**根因**
-- `main_window.h` 缺少 `#include <QVideoFrame>`，MOC 无法解析槽函数参数类型。
-
-**修复**
-- 在 `src/client/app/main_window.h` 添加 `#include <QVideoFrame>`。
-- 重新 build 通过，`sim_server` 与 `qt_client` 均成功生成。
-
-### 当前状态
-- 项目可配置、可编译。
-- 客户端核心线程链路（TCP、RTSP、记录）已串通。
-- 记录模块当前为元数据落盘（jsonl 抽样），未实现完整视频编码写盘。
-
-### 下一步建议
-1. 增加客户端配置项（host/port/rtsp/outDir）并持久化。
-2. 为 `RecordWorker` 接入 `QMediaRecorder` 或 FFmpeg 管道，实现视频+元数据同步归档。
-3. 增加断线重连策略（TCP/RTSP）与状态机。
-4. 增加基础集成测试脚本（server + client smoke test）。
-
-
-### Git 提交阶段问题与修复
-**问题**
-- 初次 `git commit` 失败：未配置提交身份（`user.name/user.email`）。
-
-**修复**
-- 在仓库内设置本地身份：
-  - `git config user.name "OpenClaw Subagent"`
-  - `git config user.email "subagent@local"`
-- 重新提交成功。
-
-
-## 验证补充（2026-03-06 11:37 GMT+8）
-- 重新执行 `cmake -S . -B build`
-- 重新执行 `cmake --build build -j4`
-- 结果：`sim_server` 与 `qt_client` 构建成功
-- 备注：收到 CMake dev warning（top-level 对非 Qt target 开启 AUTOGEN），不影响构建与运行
+### 变更文件
+- `src/client/core/app_config.h`
+- `src/client/database/database_service.h`
+- `src/client/database/database_service.cpp`
+- `src/client/repository/app_repository.h`
+- `src/client/repository/app_repository.cpp`
+- `src/client/app/main_window.h`
+- `src/client/app/main_window.cpp`
+- `src/client/app/main.cpp`
+- `src/client/network/tcp_client_worker.h`
+- `src/client/network/tcp_client_worker.cpp`
+- `src/client/CMakeLists.txt`
+- `README.md`
+- `PROGRESS.md`

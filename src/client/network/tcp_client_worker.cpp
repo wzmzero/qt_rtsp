@@ -8,23 +8,46 @@ namespace demo::client {
 
 TcpClientWorker::TcpClientWorker(QObject* parent) : QObject(parent) {
   socket_ = new QTcpSocket(this);
+  reconnectTimer_.setSingleShot(true);
+
   connect(socket_, &QTcpSocket::readyRead, this, &TcpClientWorker::onReadyRead);
   connect(socket_, &QTcpSocket::connected, this, &TcpClientWorker::onConnected);
   connect(socket_, &QTcpSocket::disconnected, this, &TcpClientWorker::onDisconnected);
+  connect(&reconnectTimer_, &QTimer::timeout, this, &TcpClientWorker::reconnect);
 }
 
-void TcpClientWorker::start(const QString& host, quint16 port) {
-  emit logMessage(QString("TCP connecting to %1:%2").arg(host).arg(port));
-  socket_->connectToHost(host, port);
+void TcpClientWorker::start(const QString& host, quint16 port, int reconnectIntervalMs) {
+  host_ = host;
+  port_ = port;
+  reconnectIntervalMs_ = reconnectIntervalMs;
+  running_ = true;
+  reconnect();
+}
+
+void TcpClientWorker::reconnect() {
+  if (!running_) return;
+  emit connectionStateChanged("connecting");
+  emit logMessage(QString("TCP connecting to %1:%2").arg(host_).arg(port_));
+  socket_->abort();
+  socket_->connectToHost(host_, port_);
 }
 
 void TcpClientWorker::stop() {
+  running_ = false;
+  reconnectTimer_.stop();
   socket_->disconnectFromHost();
 }
 
-void TcpClientWorker::onConnected() { emit logMessage("TCP connected"); }
+void TcpClientWorker::onConnected() {
+  emit connectionStateChanged("connected");
+  emit logMessage("TCP connected");
+}
 
-void TcpClientWorker::onDisconnected() { emit logMessage("TCP disconnected"); }
+void TcpClientWorker::onDisconnected() {
+  emit connectionStateChanged("disconnected");
+  emit logMessage("TCP disconnected");
+  if (running_) reconnectTimer_.start(reconnectIntervalMs_);
+}
 
 void TcpClientWorker::onReadyRead() {
   buf_.append(socket_->readAll());
