@@ -2,6 +2,11 @@ syntax = "proto3";
 
 package demo.msg;
 
+// 单个检测目标（YOLO 标准化框）
+// label_id: 类别ID（建议 0=person, 1=rod；可通过 class-map 自定义）
+// label: 类别名称（用于显示与日志）
+// confidence: 目标置信度 [0,1]
+// cx,cy,w,h: 归一化中心点与宽高（范围通常 [0,1]）
 message DetectionObject {
   int32 label_id = 1;
   string label = 2;
@@ -12,6 +17,9 @@ message DetectionObject {
   double h = 7;
 }
 
+// 检测结果容器（支持多目标）
+// label/confidence: 可作为整帧摘要；实际目标请看 objects
+// source_ts_ms: 检测算法生成时间（毫秒）
 message Detection {
   string label = 1;
   double confidence = 2;
@@ -19,6 +27,8 @@ message Detection {
   repeated DetectionObject objects = 4;
 }
 
+// GPS 数据（与检测同帧传输）
+// lat/lon 使用 E7 整型格式：真实值 = e7 / 1e7
 message Gps {
   int64 time_usec = 1;
   int32 lat_e7 = 2;
@@ -32,6 +42,11 @@ message Gps {
   uint32 satellites_visible = 10;
 }
 
+// TCP 传输主消息（建议使用 length-prefix framing）
+// type: 消息类型，当前固定为 "telemetry"
+// version: 协议版本（后续升级时用于兼容）
+// seq: 序列号（发送端递增）
+// sent_ts_ms: 发送时间戳（毫秒）
 message Telemetry {
   string type = 1;
   uint32 version = 2;
