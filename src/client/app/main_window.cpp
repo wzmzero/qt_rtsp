@@ -158,9 +158,9 @@ MainWindow::~MainWindow() {
 
 void MainWindow::setupMenus() {
   auto* fileMenu = menuBar()->addMenu("文件(File)");
-  fileMenu->addAction("保存配置", this, &MainWindow::onSaveConfig, QKeySequence::Save);
+  fileMenu->addAction("保存配置", QKeySequence::Save, this, &MainWindow::onSaveConfig);
   fileMenu->addSeparator();
-  fileMenu->addAction("退出", this, &QWidget::close, QKeySequence::Quit);
+  fileMenu->addAction("退出", QKeySequence::Quit, this, &QWidget::close);
 
   auto* pageMenu = menuBar()->addMenu("页面(Page)");
   auto* pageGroup = new QActionGroup(this);
