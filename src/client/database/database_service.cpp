@@ -121,7 +121,8 @@ bool SQLiteDatabaseService::migrate() {
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
               "event_ts_ms INTEGER NOT NULL,"
               "telemetry_id INTEGER,"
-              "screenshot_path TEXT NOT NULL,"
+              "screenshot_path TEXT,"
+              "screenshot_blob BLOB,"
               "reason_tag TEXT NOT NULL,"
               "label TEXT, confidence REAL, is_target_event INTEGER NOT NULL DEFAULT 0,"
               "FOREIGN KEY(telemetry_id) REFERENCES telemetry_results(id));")) {
@@ -221,6 +222,19 @@ bool SQLiteDatabaseService::migrate() {
     }
   }
 
+  bool hasSnapshotBlobCol = false;
+  if (q.exec("PRAGMA table_info(snapshot_events);") ) {
+    while (q.next()) {
+      if (q.value(1).toString() == "screenshot_blob") {
+        hasSnapshotBlobCol = true;
+        break;
+      }
+    }
+  }
+  if (!hasSnapshotBlobCol) {
+    q.exec("ALTER TABLE snapshot_events ADD COLUMN screenshot_blob BLOB;");
+  }
+
   return true;
 }
 
@@ -315,11 +329,11 @@ void SQLiteDatabaseService::insertTelemetryAsync(const demo::client::TelemetryPa
 }
 
 void SQLiteDatabaseService::insertSnapshotEventAsync(const demo::client::TelemetryPacket& pkt,
-                                                     const QString& screenshotPath,
+                                                     const QByteArray& screenshotBlob,
                                                      const QString& reasonTag,
                                                      bool isTargetEvent) {
   if (!ensureConnection()) return;
-  if (screenshotPath.trimmed().isEmpty()) return;
+  if (screenshotBlob.isEmpty()) return;
 
   QSqlQuery telemetryQ(db_);
   telemetryQ.prepare("INSERT INTO telemetry_results(recv_ts_ms,sent_ts_ms,source_ts_ms,label,confidence,detection_objects_json) VALUES(?,?,?,?,?,?);");
@@ -362,11 +376,12 @@ void SQLiteDatabaseService::insertSnapshotEventAsync(const demo::client::Telemet
   gpsQ.exec();
 
   QSqlQuery q(db_);
-  q.prepare("INSERT INTO snapshot_events(event_ts_ms,telemetry_id,screenshot_path,reason_tag,label,confidence,is_target_event) "
-            "VALUES(?,?,?,?,?,?,?);");
+  q.prepare("INSERT INTO snapshot_events(event_ts_ms,telemetry_id,screenshot_path,screenshot_blob,reason_tag,label,confidence,is_target_event) "
+            "VALUES(?,?,?,?,?,?,?,?);");
   q.addBindValue(pkt.recvTsMs > 0 ? pkt.recvTsMs : QDateTime::currentMSecsSinceEpoch());
   q.addBindValue(telemetryId);
-  q.addBindValue(screenshotPath);
+  q.addBindValue(QString());
+  q.addBindValue(screenshotBlob);
   q.addBindValue(reasonTag);
   q.addBindValue(pkt.detection.label);
   q.addBindValue(pkt.detection.confidence);
@@ -412,7 +427,7 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
   QList<EventRecord> items;
   if (!ensureConnection()) return items;
 
-  QString sql = "SELECT se.event_ts_ms, se.screenshot_path, se.label, se.confidence, se.is_target_event, "
+  QString sql = "SELECT se.event_ts_ms, se.screenshot_path, se.screenshot_blob, se.label, se.confidence, se.is_target_event, "
                 "IFNULL(gs.lat_deg,0), IFNULL(gs.lon_deg,0), IFNULL(tr.detection_objects_json,'[]') "
                 "FROM snapshot_events se "
                 "LEFT JOIN telemetry_results tr ON tr.id = se.telemetry_id "
@@ -440,12 +455,13 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
     EventRecord r;
     r.tsMs = q.value(0).toLongLong();
     r.screenshotPath = q.value(1).toString();
-    r.label = q.value(2).toString();
-    r.confidence = q.value(3).toDouble();
-    r.isTargetEvent = q.value(4).toInt() != 0;
-    r.latDeg = q.value(5).toDouble();
-    r.lonDeg = q.value(6).toDouble();
-    r.bboxSummary = q.value(7).toString();
+    r.screenshotBlob = q.value(2).toByteArray();
+    r.label = q.value(3).toString();
+    r.confidence = q.value(4).toDouble();
+    r.isTargetEvent = q.value(5).toInt() != 0;
+    r.latDeg = q.value(6).toDouble();
+    r.lonDeg = q.value(7).toDouble();
+    r.bboxSummary = q.value(8).toString();
     items.push_back(r);
   }
   return items;

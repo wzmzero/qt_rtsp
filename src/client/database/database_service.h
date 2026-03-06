@@ -4,6 +4,7 @@
 #include "core/types.h"
 
 #include <QObject>
+#include <QByteArray>
 #include <QtSql/QSqlDatabase>
 
 namespace demo::client {
@@ -11,6 +12,7 @@ namespace demo::client {
 struct EventRecord {
   qint64 tsMs{0};
   QString screenshotPath;
+  QByteArray screenshotBlob;
   QString label;
   double confidence{0.0};
   bool isTargetEvent{false};
@@ -53,7 +55,7 @@ public:
 public slots:
   void saveConfigAsync(const demo::client::AppConfig& cfg);
   void insertTelemetryAsync(const demo::client::TelemetryPacket& pkt);
-  void insertSnapshotEventAsync(const demo::client::TelemetryPacket& pkt, const QString& screenshotPath,
+  void insertSnapshotEventAsync(const demo::client::TelemetryPacket& pkt, const QByteArray& screenshotBlob,
                                 const QString& reasonTag, bool isTargetEvent);
   void insertAppLogAsync(qint64 tsMs, const QString& level, const QString& type, const QString& message);
   void insertPlaybackIndexAsync(const demo::client::PlaybackIndexRecord& rec);

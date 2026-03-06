@@ -16,6 +16,7 @@
 #include <QDialog>
 #include <QDoubleSpinBox>
 #include <QDialogButtonBox>
+#include <QBuffer>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
@@ -695,24 +696,28 @@ void MainWindow::refreshParsedUi(const demo::client::TelemetryPacket& pkt) {
 
 
 QString MainWindow::saveScreenshotWithMetadata(const QString& reasonTag) {
-  const QString dir = snapshotsDir_;
-  QDir().mkpath(dir);
   const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-  const QString path = QDir(dir).filePath(QString("shot_%1_%2.jpg").arg(nowMs).arg(reasonTag));
-
   const auto pix = videoWidget_->grab();
-  if (pix.isNull() || !pix.save(path, "JPG")) {
+  if (pix.isNull()) {
     appendLog("ERROR", "event", "截图失败");
+    return {};
+  }
+
+  QByteArray jpg;
+  QBuffer buffer(&jpg);
+  if (!buffer.open(QIODevice::WriteOnly) || !pix.save(&buffer, "JPG", 90)) {
+    appendLog("ERROR", "event", "截图编码失败");
     return {};
   }
 
   const bool isEvent = alertActive_;
   QMetaObject::invokeMethod(db_, "insertSnapshotEventAsync", Qt::QueuedConnection,
-                            Q_ARG(demo::client::TelemetryPacket, lastPkt_), Q_ARG(QString, path),
+                            Q_ARG(demo::client::TelemetryPacket, lastPkt_), Q_ARG(QByteArray, jpg),
                             Q_ARG(QString, reasonTag), Q_ARG(bool, isEvent));
 
-  appendLog("INFO", "event", QString("截图保存: %1").arg(path));
-  return path;
+  const QString token = QString("db://snapshot/%1").arg(nowMs);
+  appendLog("INFO", "event", QString("截图入库: %1").arg(token));
+  return token;
 }
 
 void MainWindow::onCaptureScreenshot() { saveScreenshotWithMetadata("manual"); }
@@ -736,7 +741,8 @@ void MainWindow::onRefreshEvents() {
     eventTable_->setItem(i, 2, new QTableWidgetItem(QString::number(r.confidence, 'f', 2)));
     eventTable_->setItem(i, 3, new QTableWidgetItem(QString("%1, %2").arg(r.latDeg, 0, 'f', 7).arg(r.lonDeg, 0, 'f', 7)));
     eventTable_->setItem(i, 4, new QTableWidgetItem(formatBboxSummary(r.bboxSummary)));
-    eventTable_->setItem(i, 5, new QTableWidgetItem(r.screenshotPath));
+    const QString shotRef = r.screenshotPath.isEmpty() ? QString("DB_BLOB(%1 bytes)").arg(r.screenshotBlob.size()) : r.screenshotPath;
+    eventTable_->setItem(i, 5, new QTableWidgetItem(shotRef));
     eventTable_->setItem(i, 6, new QTableWidgetItem(r.isTargetEvent ? "是" : "否"));
   }
   appendLog("INFO", "event", QString("事件查询完成: %1 条").arg(result.size()));
