@@ -145,7 +145,7 @@ bool SQLiteDatabaseService::migrate() {
               "wall_ts_ms INTEGER NOT NULL,"
               "meta_path TEXT NOT NULL,"
               "latency_ms INTEGER NOT NULL,"
-              "label TEXT, confidence REAL);")) {
+              "label TEXT, confidence REAL, lat_deg REAL DEFAULT 0, lon_deg REAL DEFAULT 0);")) {
     qWarning() << "Create playback_index failed:" << q.lastError().text();
     return false;
   }
@@ -199,6 +199,18 @@ bool SQLiteDatabaseService::migrate() {
   if (!hasDetObjCol) {
     q.exec("ALTER TABLE telemetry_results ADD COLUMN detection_objects_json TEXT;");
   }
+
+  bool hasPlaybackLat = false;
+  bool hasPlaybackLon = false;
+  if (q.exec("PRAGMA table_info(playback_index);") ) {
+    while (q.next()) {
+      const auto c = q.value(1).toString();
+      if (c == "lat_deg") hasPlaybackLat = true;
+      if (c == "lon_deg") hasPlaybackLon = true;
+    }
+  }
+  if (!hasPlaybackLat) q.exec("ALTER TABLE playback_index ADD COLUMN lat_deg REAL DEFAULT 0;");
+  if (!hasPlaybackLon) q.exec("ALTER TABLE playback_index ADD COLUMN lon_deg REAL DEFAULT 0;");
 
   if (version < 4) {
     q.exec("DELETE FROM schema_version;");
@@ -352,7 +364,7 @@ void SQLiteDatabaseService::insertSnapshotEventAsync(const demo::client::Telemet
   QSqlQuery q(db_);
   q.prepare("INSERT INTO snapshot_events(event_ts_ms,telemetry_id,screenshot_path,reason_tag,label,confidence,is_target_event) "
             "VALUES(?,?,?,?,?,?,?);");
-  q.addBindValue(QDateTime::currentMSecsSinceEpoch());
+  q.addBindValue(pkt.recvTsMs > 0 ? pkt.recvTsMs : QDateTime::currentMSecsSinceEpoch());
   q.addBindValue(telemetryId);
   q.addBindValue(screenshotPath);
   q.addBindValue(reasonTag);
@@ -381,13 +393,15 @@ void SQLiteDatabaseService::insertAppLogAsync(qint64 tsMs, const QString& level,
 void SQLiteDatabaseService::insertPlaybackIndexAsync(const demo::client::PlaybackIndexRecord& rec) {
   if (!ensureConnection()) return;
   QSqlQuery q(db_);
-  q.prepare("INSERT INTO playback_index(frame_ts_ms,wall_ts_ms,meta_path,latency_ms,label,confidence) VALUES(?,?,?,?,?,?);");
+  q.prepare("INSERT INTO playback_index(frame_ts_ms,wall_ts_ms,meta_path,latency_ms,label,confidence,lat_deg,lon_deg) VALUES(?,?,?,?,?,?,?,?);");
   q.addBindValue(rec.frameTsMs);
   q.addBindValue(rec.wallTsMs);
   q.addBindValue(rec.metaPath);
   q.addBindValue(rec.latencyMs);
   q.addBindValue(rec.label);
   q.addBindValue(rec.confidence);
+  q.addBindValue(rec.latDeg);
+  q.addBindValue(rec.lonDeg);
   if (!q.exec()) {
     qWarning() << "Insert playback_index failed:" << q.lastError().text();
   }
@@ -398,12 +412,16 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
   QList<EventRecord> items;
   if (!ensureConnection()) return items;
 
-  QString sql = "SELECT event_ts_ms, screenshot_path, label, confidence, is_target_event FROM snapshot_events "
-                "WHERE is_target_event = 1 AND event_ts_ms BETWEEN ? AND ?";
+  QString sql = "SELECT se.event_ts_ms, se.screenshot_path, se.label, se.confidence, se.is_target_event, "
+                "IFNULL(gs.lat_deg,0), IFNULL(gs.lon_deg,0), IFNULL(tr.detection_objects_json,'[]') "
+                "FROM snapshot_events se "
+                "LEFT JOIN telemetry_results tr ON tr.id = se.telemetry_id "
+                "LEFT JOIN gps_samples gs ON gs.telemetry_id = se.telemetry_id "
+                "WHERE se.is_target_event = 1 AND se.event_ts_ms BETWEEN ? AND ?";
   if (!label.trimmed().isEmpty()) {
-    sql += " AND label = ?";
+    sql += " AND se.label = ?";
   }
-  sql += " ORDER BY event_ts_ms DESC LIMIT ?";
+  sql += " ORDER BY se.event_ts_ms DESC LIMIT ?";
 
   QSqlQuery q(db_);
   q.prepare(sql);
@@ -425,6 +443,37 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
     r.label = q.value(2).toString();
     r.confidence = q.value(3).toDouble();
     r.isTargetEvent = q.value(4).toInt() != 0;
+    r.latDeg = q.value(5).toDouble();
+    r.lonDeg = q.value(6).toDouble();
+    r.bboxSummary = q.value(7).toString();
+    items.push_back(r);
+  }
+  return items;
+}
+
+
+QList<PlaybackIndexRecord> SQLiteDatabaseService::queryPlaybackIndex(int limit) {
+  QList<PlaybackIndexRecord> items;
+  if (!ensureConnection()) return items;
+
+  QSqlQuery q(db_);
+  q.prepare("SELECT frame_ts_ms,wall_ts_ms,meta_path,latency_ms,label,confidence,IFNULL(lat_deg,0),IFNULL(lon_deg,0) "
+            "FROM playback_index ORDER BY frame_ts_ms DESC LIMIT ?;");
+  q.addBindValue(limit);
+  if (!q.exec()) {
+    qWarning() << "Query playback_index failed:" << q.lastError().text();
+    return items;
+  }
+  while (q.next()) {
+    PlaybackIndexRecord r;
+    r.frameTsMs = q.value(0).toLongLong();
+    r.wallTsMs = q.value(1).toLongLong();
+    r.metaPath = q.value(2).toString();
+    r.latencyMs = q.value(3).toLongLong();
+    r.label = q.value(4).toString();
+    r.confidence = q.value(5).toDouble();
+    r.latDeg = q.value(6).toDouble();
+    r.lonDeg = q.value(7).toDouble();
     items.push_back(r);
   }
   return items;

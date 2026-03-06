@@ -23,6 +23,7 @@ class QDoubleSpinBox;
 class QStackedWidget;
 class QTableWidget;
 class QVideoWidget;
+class QSlider;
 class QSettings;
 class QTimer;
 QT_END_NAMESPACE
@@ -53,6 +54,8 @@ private slots:
   void onCaptureScreenshot();
   void onRefreshEvents();
   void onLogFilterChanged();
+  void onRefreshPlayback();
+  void onPlaybackRowChanged();
   void blinkConnectionIndicator();
 
 private:
@@ -72,6 +75,7 @@ private:
   void refreshConnectionUi();
   void refreshParsedUi(const demo::client::TelemetryPacket& pkt);
   QString buildDetectionSummary(const demo::client::TelemetryPacket& pkt, int topN = 3) const;
+  QString formatBboxSummary(const QString& detectionObjectsJson) const;
 
   struct LogEntry {
     qint64 tsMs{0};
@@ -116,6 +120,10 @@ private:
   QDateTimeEdit* eventTo_{nullptr};
   QTableWidget* eventTable_{nullptr};
 
+  QTableWidget* playbackTable_{nullptr};
+  QLabel* playbackPreviewLabel_{nullptr};
+  QLabel* playbackInfoLabel_{nullptr};
+
   QVideoWidget* videoWidget_{nullptr};
   QPushButton* screenshotBtn_{nullptr};
   QPushButton* rawDetailBtn_{nullptr};
@@ -156,5 +164,6 @@ private:
   QString dbDisplayPath_;
   QString logFilePath_;
   bool alertActive_{false};
+  qint64 lastAutoCaptureMs_{0};
   double alertThreshold_{0.70};
 };

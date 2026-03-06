@@ -14,6 +14,9 @@ struct EventRecord {
   QString label;
   double confidence{0.0};
   bool isTargetEvent{false};
+  double latDeg{0.0};
+  double lonDeg{0.0};
+  QString bboxSummary;
 };
 
 class IDatabaseService {
@@ -30,6 +33,8 @@ struct PlaybackIndexRecord {
   qint64 latencyMs{0};
   QString label;
   double confidence{0.0};
+  double latDeg{0.0};
+  double lonDeg{0.0};
 };
 
 class SQLiteDatabaseService : public QObject, public IDatabaseService {
@@ -43,6 +48,7 @@ public:
   QString dbPath() const { return dbPath_; }
 
   QList<EventRecord> queryEvents(const QString& label, qint64 fromMs, qint64 toMs, int limit);
+  QList<PlaybackIndexRecord> queryPlaybackIndex(int limit);
 
 public slots:
   void saveConfigAsync(const demo::client::AppConfig& cfg);

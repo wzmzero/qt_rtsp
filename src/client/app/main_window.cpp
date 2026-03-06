@@ -35,6 +35,7 @@
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QPlainTextEdit>
+#include <QPixmap>
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
@@ -409,8 +410,31 @@ void MainWindow::setupUi() {
   pages_->addWidget(livePage);
 
   auto* playbackPage = new QWidget(pages_);
-  auto* pbLayout = new QVBoxLayout(playbackPage);
-  pbLayout->addWidget(new QLabel("回放模式（第一阶段占位）：请在录制目录查看录像与元数据。", playbackPage));
+  auto* pbLayout = new QHBoxLayout(playbackPage);
+  playbackTable_ = new QTableWidget(playbackPage);
+  playbackTable_->setColumnCount(6);
+  playbackTable_->setHorizontalHeaderLabels({"检测时间", "标签", "置信度", "GPS", "延时(ms)", "图片"});
+  playbackTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+  playbackTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+  playbackTable_->setSelectionMode(QAbstractItemView::SingleSelection);
+  connect(playbackTable_, &QTableWidget::itemSelectionChanged, this, &MainWindow::onPlaybackRowChanged);
+
+  auto* previewPanel = new QWidget(playbackPage);
+  auto* previewLayout = new QVBoxLayout(previewPanel);
+  playbackPreviewLabel_ = new QLabel("暂无回放图片", previewPanel);
+  playbackPreviewLabel_->setMinimumSize(520, 320);
+  playbackPreviewLabel_->setAlignment(Qt::AlignCenter);
+  playbackPreviewLabel_->setStyleSheet("border:1px solid #64748b;");
+  playbackInfoLabel_ = new QLabel("", previewPanel);
+  playbackInfoLabel_->setWordWrap(true);
+  auto* refreshPbBtn = new QPushButton("刷新回放", previewPanel);
+  connect(refreshPbBtn, &QPushButton::clicked, this, &MainWindow::onRefreshPlayback);
+  previewLayout->addWidget(playbackPreviewLabel_, 1);
+  previewLayout->addWidget(playbackInfoLabel_);
+  previewLayout->addWidget(refreshPbBtn, 0, Qt::AlignRight);
+
+  pbLayout->addWidget(playbackTable_, 3);
+  pbLayout->addWidget(previewPanel, 4);
   pages_->addWidget(playbackPage);
 
   auto* logsPage = new QWidget(pages_);
@@ -457,8 +481,8 @@ void MainWindow::setupUi() {
   ef->addWidget(refreshBtn);
 
   eventTable_ = new QTableWidget(eventPage);
-  eventTable_->setColumnCount(5);
-  eventTable_->setHorizontalHeaderLabels({"时间", "标签", "置信度", "截图路径", "事件"});
+  eventTable_->setColumnCount(7);
+  eventTable_->setHorizontalHeaderLabels({"检测时间", "标签", "置信度", "GPS", "目标框", "截图路径", "事件"});
   eventTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 
   eventLayout->addWidget(eventFilterRow);
@@ -494,6 +518,8 @@ void MainWindow::onStartAll() {
 
   statusBar()->showMessage(QString("运行中 | DB: %1").arg(dbDisplayPath_));
   appendLog("INFO", "app", "Workers started");
+  onRefreshPlayback();
+  onRefreshEvents();
 }
 
 void MainWindow::onStopAll() {
@@ -539,6 +565,13 @@ void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
   recvDataView_->setPlainText(rawHistory_.mid(0, 20).join("\n"));
 
   evaluatePersonRodAlert(pkt);
+  if (alertActive_) {
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    if (nowMs - lastAutoCaptureMs_ >= 2000) {
+      const auto path = saveScreenshotWithMetadata("auto_event");
+      if (!path.isEmpty()) lastAutoCaptureMs_ = nowMs;
+    }
+  }
   refreshParsedUi(pkt);
   refreshConnectionUi();
   repo_->appendTelemetry(pkt);
@@ -705,10 +738,80 @@ void MainWindow::onRefreshEvents() {
     eventTable_->setItem(i, 0, new QTableWidgetItem(QDateTime::fromMSecsSinceEpoch(r.tsMs).toString("yyyy-MM-dd HH:mm:ss")));
     eventTable_->setItem(i, 1, new QTableWidgetItem(r.label));
     eventTable_->setItem(i, 2, new QTableWidgetItem(QString::number(r.confidence, 'f', 2)));
-    eventTable_->setItem(i, 3, new QTableWidgetItem(r.screenshotPath));
-    eventTable_->setItem(i, 4, new QTableWidgetItem(r.isTargetEvent ? "是" : "否"));
+    eventTable_->setItem(i, 3, new QTableWidgetItem(QString("%1, %2").arg(r.latDeg, 0, 'f', 7).arg(r.lonDeg, 0, 'f', 7)));
+    eventTable_->setItem(i, 4, new QTableWidgetItem(formatBboxSummary(r.bboxSummary)));
+    eventTable_->setItem(i, 5, new QTableWidgetItem(r.screenshotPath));
+    eventTable_->setItem(i, 6, new QTableWidgetItem(r.isTargetEvent ? "是" : "否"));
   }
   appendLog("INFO", "event", QString("事件查询完成: %1 条").arg(result.size()));
+}
+
+
+void MainWindow::onRefreshPlayback() {
+  QList<demo::client::PlaybackIndexRecord> rows;
+  QMetaObject::invokeMethod(db_, [this, &rows]() { rows = db_->queryPlaybackIndex(300); }, Qt::BlockingQueuedConnection);
+
+  if (!playbackTable_) return;
+  playbackTable_->setRowCount(rows.size());
+  for (int i = 0; i < rows.size(); ++i) {
+    const auto& r = rows[i];
+    playbackTable_->setItem(i, 0, new QTableWidgetItem(QDateTime::fromMSecsSinceEpoch(r.frameTsMs).toString("yyyy-MM-dd HH:mm:ss.zzz")));
+    playbackTable_->setItem(i, 1, new QTableWidgetItem(r.label));
+    playbackTable_->setItem(i, 2, new QTableWidgetItem(QString::number(r.confidence, 'f', 2)));
+    playbackTable_->setItem(i, 3, new QTableWidgetItem(QString("%1, %2").arg(r.latDeg, 0, 'f', 7).arg(r.lonDeg, 0, 'f', 7)));
+    playbackTable_->setItem(i, 4, new QTableWidgetItem(QString::number(r.latencyMs)));
+    playbackTable_->setItem(i, 5, new QTableWidgetItem(r.metaPath));
+  }
+  if (playbackTable_->rowCount() > 0) {
+    playbackTable_->selectRow(0);
+    onPlaybackRowChanged();
+  }
+}
+
+void MainWindow::onPlaybackRowChanged() {
+  if (!playbackTable_ || !playbackPreviewLabel_) return;
+  const int row = playbackTable_->currentRow();
+  if (row < 0) return;
+  const auto* pathItem = playbackTable_->item(row, 5);
+  if (!pathItem) return;
+
+  const QString p = resolvePath(pathItem->text(), pathItem->text());
+  QPixmap pix(p);
+  if (!pix.isNull()) {
+    playbackPreviewLabel_->setPixmap(pix.scaled(playbackPreviewLabel_->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+  } else {
+    playbackPreviewLabel_->setText(QString("图片不可用: %1").arg(pathItem->text()));
+    playbackPreviewLabel_->setPixmap(QPixmap());
+  }
+
+  if (playbackInfoLabel_) {
+    playbackInfoLabel_->setText(QString("时间: %1\n标签: %2  置信度: %3\nGPS: %4")
+                                    .arg(playbackTable_->item(row, 0) ? playbackTable_->item(row, 0)->text() : "--")
+                                    .arg(playbackTable_->item(row, 1) ? playbackTable_->item(row, 1)->text() : "--")
+                                    .arg(playbackTable_->item(row, 2) ? playbackTable_->item(row, 2)->text() : "--")
+                                    .arg(playbackTable_->item(row, 3) ? playbackTable_->item(row, 3)->text() : "--"));
+  }
+}
+
+QString MainWindow::formatBboxSummary(const QString& detectionObjectsJson) const {
+  const auto doc = QJsonDocument::fromJson(detectionObjectsJson.toUtf8());
+  if (!doc.isArray()) return "--";
+  QStringList parts;
+  const auto arr = doc.array();
+  for (int i = 0; i < arr.size() && i < 2; ++i) {
+    const auto o = arr[i].toObject();
+    const auto box = o.value("bbox").toArray();
+    if (box.size() == 4) {
+      parts << QString("%1:[%2,%3,%4,%5]")
+                   .arg(o.value("label").toString())
+                   .arg(box[0].toDouble(), 0, 'f', 2)
+                   .arg(box[1].toDouble(), 0, 'f', 2)
+                   .arg(box[2].toDouble(), 0, 'f', 2)
+                   .arg(box[3].toDouble(), 0, 'f', 2);
+    }
+  }
+  if (parts.isEmpty()) return "--";
+  return parts.join(" | ");
 }
 
 void MainWindow::onLogFilterChanged() { refreshLogView(); }

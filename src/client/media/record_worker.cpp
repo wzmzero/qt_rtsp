@@ -7,6 +7,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTextStream>
+#include <QImage>
+#include <QVideoFrame>
 
 namespace demo::client {
 
@@ -71,15 +73,29 @@ void RecordWorker::enqueue(const RecordItem& item) {
   QTextStream ts(&f);
   ts << QJsonDocument(root).toJson(QJsonDocument::Compact) << '\n';
 
+  const qint64 frameTs = item.frameTsMs > 0 ? item.frameTsMs : QDateTime::currentMSecsSinceEpoch();
+  const QString imageAbs = outDir_ + QString("/frame_%1.jpg").arg(frameTs);
+  bool imageSaved = false;
+  QVideoFrame frame(item.frame);
+  if (frame.isValid()) {
+    if (frame.map(QVideoFrame::ReadOnly)) {
+      const QImage img = frame.toImage();
+      if (!img.isNull()) imageSaved = img.save(imageAbs, "JPG", 90);
+      frame.unmap();
+    }
+  }
+
   demo::client::PlaybackIndexRecord rec;
-  rec.frameTsMs = item.frameTsMs;
+  rec.frameTsMs = frameTs;
   rec.wallTsMs = root["wall_ts_ms"].toInteger();
-  const QString metaAbs = outDir_ + "/record_meta.jsonl";
-  const QString metaRel = QDir::current().relativeFilePath(metaAbs);
-  rec.metaPath = metaRel.startsWith("..") ? metaAbs : QString("./%1").arg(metaRel);
+  const QString p = imageSaved ? imageAbs : (outDir_ + "/record_meta.jsonl");
+  const QString rel = QDir::current().relativeFilePath(p);
+  rec.metaPath = rel.startsWith("..") ? p : QString("./%1").arg(rel);
   rec.latencyMs = root["latency_ms"].toInteger();
   rec.label = item.telemetry.detection.label;
   rec.confidence = item.telemetry.detection.confidence;
+  rec.latDeg = static_cast<double>(item.telemetry.gps.latE7) / 10000000.0;
+  rec.lonDeg = static_cast<double>(item.telemetry.gps.lonE7) / 10000000.0;
   emit playbackIndexed(rec);
 }
 
