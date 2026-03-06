@@ -78,15 +78,11 @@ QWidget* makeStateRow(const QString& title, QLabel** lamp, QLabel** text, QWidge
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   projectRootDir_ = QDir::currentPath();
-  const QString confDir = QDir(projectRootDir_).filePath("./conf");
-  const QString dbDir = QDir(projectRootDir_).filePath("./config");
-  QDir().mkpath(confDir);
-  QDir().mkpath(dbDir);
-  settings_ = new QSettings(QDir(confDir).filePath("client.ini"), QSettings::IniFormat, this);
-  dataDir_ = resolvePath(settings_->value("storage/data_dir").toString(), "./data");
+  const QString cfgDir = QDir(projectRootDir_).filePath("./config");
+  QDir().mkpath(cfgDir);
+  settings_ = new QSettings(QDir(cfgDir).filePath("client.ini"), QSettings::IniFormat, this);
   logsDir_ = resolvePath(settings_->value("storage/logs_dir").toString(), "./logs");
-  snapshotsDir_ = resolvePath(settings_->value("storage/snapshots_dir").toString(), "./snapshots");
-  dbPath_ = QDir(dbDir).filePath("client_cfg.db");
+  dbPath_ = QDir(cfgDir).filePath("client_cfg.db");
   dbDisplayPath_ = "./config/client_cfg.db";
 
   const QString legacyDbPath = QDir(projectRootDir_).filePath("./data/client_data.sqlite");
@@ -140,8 +136,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   }
 
   config_ = repo_->loadConfig();
-  if (config_.recordDir.isEmpty()) config_.recordDir = "./recordings";
-  config_.recordDir = resolvePath(config_.recordDir, "./recordings");
+  const QString rd = config_.recordDir.trimmed();
+  if (rd.isEmpty() || rd == "./recordings" || rd == "recordings" || rd.endsWith("/recordings")) {
+    config_.recordDir = "./media/record";
+  }
+  config_.recordDir = resolvePath(config_.recordDir, "./media/record");
   if (config_.theme.isEmpty()) config_.theme = "dark";
   applyConfigToUi(config_);
 
@@ -494,9 +493,7 @@ void MainWindow::setupUi() {
 
 void MainWindow::onStartAll() {
   config_ = collectConfigFromUi();
-  settings_->setValue("storage/data_dir", toStoredRelativePath(dataDir_));
   settings_->setValue("storage/logs_dir", toStoredRelativePath(logsDir_));
-  settings_->setValue("storage/snapshots_dir", toStoredRelativePath(snapshotsDir_));
   settings_->sync();
   repo_->saveConfig(config_);
 
@@ -505,7 +502,7 @@ void MainWindow::onStartAll() {
   responseBound_ = false;
   refreshConnectionUi();
 
-  const QString runtimeRecordDir = resolvePath(config_.recordDir, "./recordings");
+  const QString runtimeRecordDir = resolvePath(config_.recordDir, "./media/record");
   QMetaObject::invokeMethod(tcp_, "start", Qt::QueuedConnection, Q_ARG(QString, config_.tcpHost),
                             Q_ARG(quint16, config_.tcpPort), Q_ARG(int, config_.reconnectIntervalMs));
   stream_->start(QUrl(config_.rtspUrl));
@@ -534,9 +531,7 @@ void MainWindow::onSaveConfig() {
   config_ = collectConfigFromUi();
   config_.windowGeometry = saveGeometry();
   config_.windowState = saveState();
-  settings_->setValue("storage/data_dir", toStoredRelativePath(dataDir_));
   settings_->setValue("storage/logs_dir", toStoredRelativePath(logsDir_));
-  settings_->setValue("storage/snapshots_dir", toStoredRelativePath(snapshotsDir_));
   settings_->sync();
   repo_->saveConfig(config_);
   applyTheme(config_.theme);
@@ -822,7 +817,7 @@ demo::client::AppConfig MainWindow::collectConfigFromUi() const {
   cfg.tcpHost = tcpHostEdit_->text().trimmed();
   cfg.tcpPort = static_cast<quint16>(tcpPortSpin_->value());
   cfg.reconnectIntervalMs = reconnectSpin_->value();
-  cfg.recordDir = toStoredRelativePath(resolvePath(recordDirEdit_->text().trimmed(), "./recordings"));
+  cfg.recordDir = toStoredRelativePath(resolvePath(recordDirEdit_->text().trimmed(), "./media/record"));
   cfg.recordEnabled = recordEnabledCheck_->isChecked();
   cfg.theme = config_.theme.isEmpty() ? "dark" : config_.theme;
   cfg.alertThreshold = alertThresholdSpin_ ? alertThresholdSpin_->value() : alertThreshold_;
@@ -834,7 +829,12 @@ void MainWindow::applyConfigToUi(const demo::client::AppConfig& cfg) {
   tcpHostEdit_->setText(cfg.tcpHost);
   tcpPortSpin_->setValue(cfg.tcpPort);
   reconnectSpin_->setValue(cfg.reconnectIntervalMs);
-  recordDirEdit_->setText(toStoredRelativePath(resolvePath(cfg.recordDir, "./recordings")));
+  QString recordDir = cfg.recordDir;
+  const QString rd2 = recordDir.trimmed();
+  if (rd2.isEmpty() || rd2 == "./recordings" || rd2 == "recordings" || rd2.endsWith("/recordings")) {
+    recordDir = "./media/record";
+  }
+  recordDirEdit_->setText(toStoredRelativePath(resolvePath(recordDir, "./media/record")));
   recordEnabledCheck_->setChecked(cfg.recordEnabled);
   config_.theme = cfg.theme.isEmpty() ? "dark" : cfg.theme;
   alertThreshold_ = cfg.alertThreshold;
@@ -891,9 +891,8 @@ QString MainWindow::toStoredRelativePath(const QString& path) const {
 }
 
 void MainWindow::ensureRuntimeDirs() {
-  QDir().mkpath(dataDir_);
   QDir().mkpath(logsDir_);
-  QDir().mkpath(snapshotsDir_);
+  QDir().mkpath(QDir(projectRootDir_).filePath("./media/record"));
 }
 
 double MainWindow::bboxIoU(const QRectF& a, const QRectF& b) const {

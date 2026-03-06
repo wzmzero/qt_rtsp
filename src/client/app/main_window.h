@@ -156,9 +156,7 @@ private:
   demo::client::TelemetryPacket lastPkt_{};
   demo::client::AppConfig config_{};
   QString projectRootDir_;
-  QString dataDir_;
   QString logsDir_;
-  QString snapshotsDir_;
   QString dbPath_;
   QString dbDisplayPath_;
   QString logFilePath_;
