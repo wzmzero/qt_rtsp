@@ -1,16 +1,14 @@
 #include "app/main_window.h"
 
-#include "database/database_service.h"
 #include "media/record_worker.h"
 #include "media/stream_worker.h"
 #include "network/tcp_client_worker.h"
-#include "repository/app_repository.h"
 
 #include <QAction>
 #include <QApplication>
-#include <QDateTime>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDateTime>
 #include <QDir>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -25,6 +23,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
+#include <QSplitter>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QToolBar>
@@ -35,10 +34,6 @@
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   settings_ = new QSettings("qt_rtsp_tcp_project", "qt_client", this);
-  const auto dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-  db_ = new demo::client::SQLiteDatabaseService(dataDir + "/client_data.sqlite");
-  db_->initialize();
-  repo_ = new demo::client::AppRepository(db_, settings_, this);
 
   setupUi();
   setupMenus();
@@ -50,12 +45,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   tcp_->moveToThread(&tcpThread_);
   stream_->moveToThread(&streamThread_);
   recorder_->moveToThread(&recordThread_);
-  db_->moveToThread(&dbThread_);
 
   connect(&tcpThread_, &QThread::finished, tcp_, &QObject::deleteLater);
   connect(&streamThread_, &QThread::finished, stream_, &QObject::deleteLater);
   connect(&recordThread_, &QThread::finished, recorder_, &QObject::deleteLater);
-  connect(&dbThread_, &QThread::finished, db_, &QObject::deleteLater);
 
   connect(tcp_, &demo::client::TcpClientWorker::telemetryReceived, this, &MainWindow::onTelemetry);
   connect(tcp_, &demo::client::TcpClientWorker::connectionStateChanged, this, &MainWindow::onConnectionStateChanged);
@@ -68,14 +61,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   tcpThread_.start();
   streamThread_.start();
   recordThread_.start();
-  dbThread_.start();
 
-  config_ = repo_->loadConfig();
-  if (config_.recordDir.isEmpty()) config_.recordDir = dataDir + "/records";
+  config_ = loadConfigFromSettings();
+  if (config_.recordDir.isEmpty()) {
+    const auto dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    config_.recordDir = dataDir + "/records";
+  }
   applyConfigToUi(config_);
 
-  if (!config_.windowGeometry.isEmpty()) restoreGeometry(config_.windowGeometry);
-  if (!config_.windowState.isEmpty()) restoreState(config_.windowState);
+  if (!config_.windowGeometry.isEmpty()) {
+    restoreGeometry(config_.windowGeometry);
+  }
+  if (!config_.windowState.isEmpty()) {
+    restoreState(config_.windowState);
+  }
 
   onLog("MainWindow initialized");
 }
@@ -86,17 +85,15 @@ MainWindow::~MainWindow() {
   config_ = collectConfigFromUi();
   config_.windowGeometry = saveGeometry();
   config_.windowState = saveState();
-  repo_->saveConfig(config_);
+  saveConfigToSettings(config_);
 
   tcpThread_.quit();
   streamThread_.quit();
   recordThread_.quit();
-  dbThread_.quit();
 
   tcpThread_.wait();
   streamThread_.wait();
   recordThread_.wait();
-  dbThread_.wait();
 }
 
 void MainWindow::setupMenus() {
@@ -109,11 +106,17 @@ void MainWindow::setupMenus() {
   auto* stopAction = connMenu->addAction("停止全部");
 
   auto* viewMenu = menuBar()->addMenu("视图");
-  viewMenu->addAction("暗色主题", [this] { themeCombo_->setCurrentText("dark"); onSaveConfig(); });
-  viewMenu->addAction("浅色主题", [this] { themeCombo_->setCurrentText("light"); onSaveConfig(); });
+  viewMenu->addAction("暗色主题", [this] {
+    themeCombo_->setCurrentText("dark");
+    onSaveConfig();
+  });
+  viewMenu->addAction("浅色主题", [this] {
+    themeCombo_->setCurrentText("light");
+    onSaveConfig();
+  });
 
   auto* helpMenu = menuBar()->addMenu("帮助");
-  helpMenu->addAction("关于", [this] { QMessageBox::information(this, "关于", "Qt RTSP + TCP Client\nUI升级版"); });
+  helpMenu->addAction("关于", [this] { QMessageBox::information(this, "关于", "Qt RTSP + TCP Client\nUI可配置版"); });
 
   auto* toolBar = addToolBar("main");
   toolBar->addAction(startAction);
@@ -128,13 +131,35 @@ void MainWindow::setupMenus() {
 
 void MainWindow::setupUi() {
   setWindowTitle("Qt RTSP + TCP Client Demo");
-  resize(1280, 780);
+  resize(1360, 820);
 
   auto* root = new QWidget(this);
   auto* rootLayout = new QVBoxLayout(root);
-  auto* topLayout = new QHBoxLayout();
 
-  auto* cfgGroup = new QGroupBox("连接与录制配置", root);
+  auto* splitter = new QSplitter(Qt::Horizontal, root);
+
+  auto* videoPane = new QGroupBox("实时视频", splitter);
+  auto* videoLayout = new QVBoxLayout(videoPane);
+  videoWidget_ = new QVideoWidget(videoPane);
+  videoWidget_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  videoWidget_->setMinimumSize(900, 520);
+  videoLayout->addWidget(videoWidget_, 1, Qt::AlignCenter);
+
+  auto* sidePane = new QWidget(splitter);
+  auto* sideLayout = new QVBoxLayout(sidePane);
+
+  auto* statusBox = new QGroupBox("状态面板", sidePane);
+  auto* statusLayout = new QVBoxLayout(statusBox);
+  connState_ = new QLabel("连接状态: stopped", statusBox);
+  tsLabel_ = new QLabel("时间戳: -", statusBox);
+  detectionLabel_ = new QLabel("检测结果: -", statusBox);
+  gpsLabel_ = new QLabel("GPS: -", statusBox);
+  statusLayout->addWidget(connState_);
+  statusLayout->addWidget(tsLabel_);
+  statusLayout->addWidget(detectionLabel_);
+  statusLayout->addWidget(gpsLabel_);
+
+  auto* cfgGroup = new QGroupBox("参数编辑区", sidePane);
   auto* form = new QFormLayout(cfgGroup);
 
   rtspEdit_ = new QLineEdit(cfgGroup);
@@ -152,16 +177,10 @@ void MainWindow::setupUi() {
   auto* browseBtn = new QPushButton("浏览", cfgGroup);
   connect(browseBtn, &QPushButton::clicked, this, [this] {
     const auto d = QFileDialog::getExistingDirectory(this, "选择录制目录", recordDirEdit_->text());
-    if (!d.isEmpty()) recordDirEdit_->setText(d);
+    if (!d.isEmpty()) {
+      recordDirEdit_->setText(d);
+    }
   });
-
-  auto* saveCfgBtn = new QPushButton("保存配置", cfgGroup);
-  connect(saveCfgBtn, &QPushButton::clicked, this, &MainWindow::onSaveConfig);
-  auto* startBtn = new QPushButton("启动", cfgGroup);
-  auto* stopBtn = new QPushButton("停止", cfgGroup);
-
-  connect(startBtn, &QPushButton::clicked, this, &MainWindow::onStartAll);
-  connect(stopBtn, &QPushButton::clicked, this, &MainWindow::onStopAll);
 
   auto* recordRow = new QWidget(cfgGroup);
   auto* recordLayout = new QHBoxLayout(recordRow);
@@ -172,51 +191,40 @@ void MainWindow::setupUi() {
   auto* buttonRow = new QWidget(cfgGroup);
   auto* buttonLayout = new QHBoxLayout(buttonRow);
   buttonLayout->setContentsMargins(0, 0, 0, 0);
+  auto* startBtn = new QPushButton("启动", buttonRow);
+  auto* stopBtn = new QPushButton("停止", buttonRow);
+  auto* saveCfgBtn = new QPushButton("保存配置", buttonRow);
   buttonLayout->addWidget(startBtn);
   buttonLayout->addWidget(stopBtn);
   buttonLayout->addWidget(saveCfgBtn);
+
+  connect(startBtn, &QPushButton::clicked, this, &MainWindow::onStartAll);
+  connect(stopBtn, &QPushButton::clicked, this, &MainWindow::onStopAll);
+  connect(saveCfgBtn, &QPushButton::clicked, this, &MainWindow::onSaveConfig);
 
   form->addRow("RTSP URL", rtspEdit_);
   form->addRow("TCP Host", tcpHostEdit_);
   form->addRow("TCP Port", tcpPortSpin_);
   form->addRow("重连间隔(ms)", reconnectSpin_);
-  form->addRow("录制目录", recordRow);
+  form->addRow("录制路径", recordRow);
   form->addRow("录制开关", recordEnabledCheck_);
   form->addRow("主题", themeCombo_);
   form->addRow("控制", buttonRow);
 
-  videoWidget_ = new QVideoWidget(root);
-  videoWidget_->setMinimumSize(760, 420);
-  videoWidget_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  sideLayout->addWidget(statusBox);
+  sideLayout->addWidget(cfgGroup, 1);
 
-  auto* videoBox = new QGroupBox("实时视频", root);
-  auto* videoLayout = new QVBoxLayout(videoBox);
-  videoLayout->addWidget(videoWidget_, 1, Qt::AlignCenter);
-
-  auto* statusBox = new QGroupBox("状态面板", root);
-  auto* statusLayout = new QVBoxLayout(statusBox);
-  connState_ = new QLabel("连接状态: stopped", statusBox);
-  tsLabel_ = new QLabel("时间戳: -", statusBox);
-  detectionLabel_ = new QLabel("检测结果: -", statusBox);
-  gpsLabel_ = new QLabel("GPS: -", statusBox);
-  statusLayout->addWidget(connState_);
-  statusLayout->addWidget(tsLabel_);
-  statusLayout->addWidget(detectionLabel_);
-  statusLayout->addWidget(gpsLabel_);
-
-  auto* rightPanel = new QVBoxLayout();
-  rightPanel->addWidget(videoBox, 4);
-  rightPanel->addWidget(statusBox, 1);
-
-  topLayout->addWidget(cfgGroup, 2);
-  topLayout->addLayout(rightPanel, 5);
+  splitter->addWidget(videoPane);
+  splitter->addWidget(sidePane);
+  splitter->setStretchFactor(0, 4);
+  splitter->setStretchFactor(1, 1);
 
   logs_ = new QPlainTextEdit(root);
   logs_->setReadOnly(true);
   logs_->setMaximumBlockCount(1500);
   logs_->setMinimumHeight(160);
 
-  rootLayout->addLayout(topLayout, 1);
+  rootLayout->addWidget(splitter, 1);
   rootLayout->addWidget(logs_);
   setCentralWidget(root);
 
@@ -225,7 +233,7 @@ void MainWindow::setupUi() {
 
 void MainWindow::onStartAll() {
   config_ = collectConfigFromUi();
-  repo_->saveConfig(config_);
+  saveConfigToSettings(config_);
 
   QMetaObject::invokeMethod(tcp_, "start", Qt::QueuedConnection, Q_ARG(QString, config_.tcpHost),
                             Q_ARG(quint16, config_.tcpPort), Q_ARG(int, config_.reconnectIntervalMs));
@@ -250,25 +258,16 @@ void MainWindow::onSaveConfig() {
   config_ = collectConfigFromUi();
   config_.windowGeometry = saveGeometry();
   config_.windowState = saveState();
-  repo_->saveConfig(config_);
+  saveConfigToSettings(config_);
   applyTheme(config_.theme);
-  onLog("Config saved to QSettings + SQLite");
+  onLog("Config saved to QSettings");
 }
 
 void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
   lastPkt_ = pkt;
-  tsLabel_->setText(QString("时间戳: source=%1 sent=%2 recv=%3")
-                        .arg(pkt.detection.sourceTsMs)
-                        .arg(pkt.sentTsMs)
-                        .arg(pkt.recvTsMs));
+  tsLabel_->setText(QString("时间戳: source=%1 sent=%2 recv=%3").arg(pkt.detection.sourceTsMs).arg(pkt.sentTsMs).arg(pkt.recvTsMs));
   detectionLabel_->setText(QString("检测结果: %1 (%.2f)").arg(pkt.detection.label).arg(pkt.detection.confidence, 0, 'f', 2));
-  gpsLabel_->setText(QString("GPS: %1,%2 alt=%3 sat=%4")
-                         .arg(pkt.gps.latE7)
-                         .arg(pkt.gps.lonE7)
-                         .arg(pkt.gps.altMm)
-                         .arg(pkt.gps.satellitesVisible));
-
-  repo_->appendTelemetry(pkt);
+  gpsLabel_->setText(QString("GPS: %1,%2 alt=%3 sat=%4").arg(pkt.gps.latE7).arg(pkt.gps.lonE7).arg(pkt.gps.altMm).arg(pkt.gps.satellitesVisible));
 }
 
 void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
@@ -276,7 +275,9 @@ void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
     videoWidget_->videoSink()->setVideoFrame(frame);
   }
 
-  if (!config_.recordEnabled) return;
+  if (!config_.recordEnabled) {
+    return;
+  }
 
   demo::client::RecordItem item;
   item.frameTsMs = tsMs;
@@ -321,4 +322,31 @@ void MainWindow::applyTheme(const QString& theme) {
   } else {
     qApp->setStyleSheet("QMainWindow{background:#1e293b;color:#e2e8f0;} QGroupBox{font-weight:600;border:1px solid #475569;border-radius:8px;margin-top:12px;padding-top:8px;} QLabel{color:#e2e8f0;} QLineEdit,QSpinBox,QComboBox,QPlainTextEdit{background:#0f172a;color:#e2e8f0;border:1px solid #334155;padding:4px;} QPushButton{background:#334155;color:#e2e8f0;padding:6px 12px;border-radius:4px;} QPushButton:hover{background:#475569;}");
   }
+}
+
+demo::client::AppConfig MainWindow::loadConfigFromSettings() const {
+  demo::client::AppConfig cfg;
+  cfg.rtspUrl = settings_->value("connection/rtsp_url", cfg.rtspUrl).toString();
+  cfg.tcpHost = settings_->value("connection/tcp_host", cfg.tcpHost).toString();
+  cfg.tcpPort = settings_->value("connection/tcp_port", cfg.tcpPort).toUInt();
+  cfg.reconnectIntervalMs = settings_->value("connection/reconnect_ms", cfg.reconnectIntervalMs).toInt();
+  cfg.recordDir = settings_->value("record/dir", cfg.recordDir).toString();
+  cfg.recordEnabled = settings_->value("record/enabled", cfg.recordEnabled).toBool();
+  cfg.theme = settings_->value("view/theme", cfg.theme).toString();
+  cfg.windowGeometry = settings_->value("view/window_geometry", cfg.windowGeometry).toByteArray();
+  cfg.windowState = settings_->value("view/window_state", cfg.windowState).toByteArray();
+  return cfg;
+}
+
+void MainWindow::saveConfigToSettings(const demo::client::AppConfig& cfg) {
+  settings_->setValue("connection/rtsp_url", cfg.rtspUrl);
+  settings_->setValue("connection/tcp_host", cfg.tcpHost);
+  settings_->setValue("connection/tcp_port", cfg.tcpPort);
+  settings_->setValue("connection/reconnect_ms", cfg.reconnectIntervalMs);
+  settings_->setValue("record/dir", cfg.recordDir);
+  settings_->setValue("record/enabled", cfg.recordEnabled);
+  settings_->setValue("view/theme", cfg.theme);
+  settings_->setValue("view/window_geometry", cfg.windowGeometry);
+  settings_->setValue("view/window_state", cfg.windowState);
+  settings_->sync();
 }

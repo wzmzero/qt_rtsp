@@ -10,7 +10,6 @@
 QT_BEGIN_NAMESPACE
 class QCheckBox;
 class QComboBox;
-class QGroupBox;
 class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
@@ -23,8 +22,6 @@ namespace demo::client {
 class TcpClientWorker;
 class StreamWorker;
 class RecordWorker;
-class SQLiteDatabaseService;
-class AppRepository;
 }
 
 class MainWindow : public QMainWindow {
@@ -48,6 +45,8 @@ private:
   demo::client::AppConfig collectConfigFromUi() const;
   void applyConfigToUi(const demo::client::AppConfig& cfg);
   void applyTheme(const QString& theme);
+  demo::client::AppConfig loadConfigFromSettings() const;
+  void saveConfigToSettings(const demo::client::AppConfig& cfg);
 
   QLabel* connState_{nullptr};
   QLabel* tsLabel_{nullptr};
@@ -68,13 +67,10 @@ private:
   QThread tcpThread_;
   QThread streamThread_;
   QThread recordThread_;
-  QThread dbThread_;
 
   demo::client::TcpClientWorker* tcp_{nullptr};
   demo::client::StreamWorker* stream_{nullptr};
   demo::client::RecordWorker* recorder_{nullptr};
-  demo::client::SQLiteDatabaseService* db_{nullptr};
-  demo::client::AppRepository* repo_{nullptr};
   QSettings* settings_{nullptr};
 
   demo::client::TelemetryPacket lastPkt_{};
