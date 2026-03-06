@@ -89,7 +89,6 @@ private:
   QSpinBox* reconnectSpin_{nullptr};
   QLineEdit* recordDirEdit_{nullptr};
   QCheckBox* recordEnabledCheck_{nullptr};
-  QComboBox* themeCombo_{nullptr};
 
   QComboBox* logLevelFilter_{nullptr};
   QComboBox* logTypeFilter_{nullptr};

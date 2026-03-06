@@ -1,0 +1,116 @@
+2026-03-06 16:26:17.223 [INFO] [app] MainWindow initialized
+2026-03-06 16:26:17.223 [INFO] [app] AUTOTEST enabled: start->save->stop sequence
+2026-03-06 16:26:17.659 [INFO] [app] Workers started
+2026-03-06 16:26:17.659 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-06 16:26:17.660 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-06 16:26:17.661 [INFO] [record] Record worker started: /home/wzm/qt_rtsp_tcp_project/./recordings
+2026-03-06 16:26:17.662 [INFO] [tcp] TCP connected
+2026-03-06 16:26:19.305 [INFO] [app] Config saved to QSettings + SQLite
+2026-03-06 16:26:20.754 [INFO] [app] Workers stopped
+2026-03-06 16:26:20.755 [INFO] [tcp] TCP disconnected
+2026-03-06 16:26:20.755 [INFO] [record] Record worker stopped
+2026-03-06 16:26:20.791 [INFO] [stream] RTSP stopped
+2026-03-06 16:26:21.553 [INFO] [app] Workers stopped
+2026-03-06 16:27:52.849 [INFO] [app] MainWindow initialized
+2026-03-06 16:27:52.850 [INFO] [app] AUTOTEST enabled: start->save->stop sequence
+2026-03-06 16:27:53.292 [INFO] [app] Workers started
+2026-03-06 16:27:53.293 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-06 16:27:53.294 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-06 16:27:53.295 [INFO] [record] Record worker started: /home/wzm/qt_rtsp_tcp_project/./recordings
+2026-03-06 16:27:53.297 [INFO] [tcp] TCP connected
+2026-03-06 16:27:54.297 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.3,0.36,0.3,0.44],"confidence":0.927154,"label":"person"},{"bbox":[0.31,0.37,0.28,0.13],"confidence":0.973415,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.803783,"label":"boat"}]
+2026-03-06 16:27:54.813 [INFO] [app] Config saved to QSettings + SQLite
+2026-03-06 16:27:56.273 [INFO] [app] Workers stopped
+2026-03-06 16:27:56.275 [INFO] [record] Record worker stopped
+2026-03-06 16:27:56.278 [INFO] [tcp] TCP disconnected
+2026-03-06 16:27:56.282 [INFO] [stream] RTSP stopped
+2026-03-06 16:27:57.274 [INFO] [app] Workers stopped
+2026-03-06 16:28:52.459 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 16:28:52.459 [INFO] [app] AUTOTEST enabled: start->save->stop sequence
+2026-03-06 16:28:52.893 [INFO] [app] StatusBar => 运行中 | DB: ./config/client_cfg.db
+2026-03-06 16:28:52.894 [INFO] [app] Workers started
+2026-03-06 16:28:52.895 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-06 16:28:52.896 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-06 16:28:52.897 [INFO] [record] Record worker started: /home/wzm/qt_rtsp_tcp_project/./recordings
+2026-03-06 16:28:52.899 [INFO] [tcp] TCP connected
+2026-03-06 16:28:53.896 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.3,0.36,0.3,0.44],"confidence":0.75743,"label":"person"},{"bbox":[0.31,0.37,0.28,0.13],"confidence":0.814817,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.598228,"label":"boat"}]
+2026-03-06 16:28:54.511 [INFO] [app] Config saved to QSettings + SQLite
+2026-03-06 16:28:55.961 [INFO] [app] StatusBar => 已停止 | DB: ./config/client_cfg.db
+2026-03-06 16:28:55.962 [INFO] [app] Workers stopped
+2026-03-06 16:28:55.963 [INFO] [record] Record worker stopped
+2026-03-06 16:28:55.963 [INFO] [tcp] TCP disconnected
+2026-03-06 16:28:55.963 [INFO] [stream] RTSP stopped
+2026-03-06 16:28:56.962 [INFO] [app] StatusBar => 已停止 | DB: ./config/client_cfg.db
+2026-03-06 16:28:56.964 [INFO] [app] Workers stopped
+2026-03-06 16:30:41.043 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 16:30:41.043 [INFO] [app] AUTOTEST enabled: start->save->stop sequence
+2026-03-06 16:30:41.480 [INFO] [app] StatusBar => 运行中 | DB: ./config/client_cfg.db
+2026-03-06 16:30:41.481 [INFO] [app] Workers started
+2026-03-06 16:30:41.483 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-06 16:30:41.484 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-06 16:30:41.484 [INFO] [record] Record worker started: /home/wzm/qt_rtsp_tcp_project/./recordings
+2026-03-06 16:30:41.486 [INFO] [tcp] TCP connected
+2026-03-06 16:30:42.486 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.3,0.36,0.3,0.44],"confidence":0.411344,"label":"person"},{"bbox":[0.31,0.37,0.28,0.13],"confidence":0.354105,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.486429,"label":"boat"}]
+2026-03-06 16:30:42.992 [INFO] [app] Config saved to QSettings + SQLite
+2026-03-06 16:30:44.382 [INFO] [app] StatusBar => 已停止 | DB: ./config/client_cfg.db
+2026-03-06 16:30:44.384 [INFO] [app] Workers stopped
+2026-03-06 16:30:44.385 [INFO] [record] Record worker stopped
+2026-03-06 16:30:44.386 [INFO] [tcp] TCP disconnected
+2026-03-06 16:30:44.388 [INFO] [stream] RTSP stopped
+2026-03-06 16:30:45.383 [INFO] [app] StatusBar => 已停止 | DB: ./config/client_cfg.db
+2026-03-06 16:30:45.385 [INFO] [app] Workers stopped
+2026-03-06 16:33:05.067 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 16:34:17.681 [INFO] [app] StatusBar => 运行中 | DB: ./config/client_cfg.db
+2026-03-06 16:34:17.682 [INFO] [app] Workers started
+2026-03-06 16:34:17.682 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-06 16:34:17.683 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-06 16:34:17.683 [INFO] [record] Record worker started: /home/wzm/qt_rtsp_tcp_project/./recordings
+2026-03-06 16:34:17.685 [INFO] [tcp] TCP connected
+2026-03-06 16:34:18.686 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.3,0.36,0.3,0.44],"confidence":0.6718,"label":"person"},{"bbox":[0.31,0.37,0.28,0.13],"confidence":0.858338,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.561822,"label":"boat"}]
+2026-03-06 16:34:19.933 [INFO] [app] StatusBar => 运行中 | DB: ./config/client_cfg.db
+2026-03-06 16:34:19.934 [INFO] [app] Workers started
+2026-03-06 16:34:19.935 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-06 16:34:19.936 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-06 16:34:19.937 [INFO] [tcp] TCP disconnected
+2026-03-06 16:34:19.937 [INFO] [record] Record worker started: /home/wzm/qt_rtsp_tcp_project/./recordings
+2026-03-06 16:34:19.938 [INFO] [tcp] TCP connected
+2026-03-06 16:34:22.687 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.3,0.36,0.3,0.44],"confidence":0.529698,"label":"person"},{"bbox":[0.31,0.37,0.28,0.13],"confidence":0.929732,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.403392,"label":"boat"}]
+2026-03-06 16:34:25.689 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.36,0.36,0.3,0.44],"confidence":0.548743,"label":"person"},{"bbox":[0.37,0.37,0.28,0.13],"confidence":0.768272,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.400529,"label":"boat"},{"bbox":[0.24,0.7,0.08,0.1],"confidence":0.664756,"label":"buoy"}]
+2026-03-06 16:34:28.689 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.42,0.36,0.3,0.44],"confidence":0.648085,"label":"person"},{"bbox":[0.43,0.37,0.28,0.13],"confidence":0.738167,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.548904,"label":"boat"}]
+2026-03-06 16:34:31.690 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.32,0.36,0.3,0.44],"confidence":0.53895,"label":"person"},{"bbox":[0.33,0.37,0.28,0.13],"confidence":0.367081,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.791054,"label":"boat"},{"bbox":[0.12,0.7,0.08,0.1],"confidence":0.9271,"label":"buoy"}]
+2026-03-06 16:34:33.357 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.34,0.36,0.3,0.44],"confidence":0.718526,"label":"person"},{"bbox":[0.35,0.37,0.28,0.13],"confidence":0.512896,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.64131,"label":"boat"}]
+2026-03-06 16:34:35.356 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.38,0.36,0.3,0.44],"confidence":0.513713,"label":"person"},{"bbox":[0.39,0.37,0.28,0.13],"confidence":0.871401,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.861451,"label":"boat"}]
+2026-03-06 16:34:38.358 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.28,0.36,0.3,0.44],"confidence":0.74487,"label":"person"},{"bbox":[0.29,0.37,0.28,0.13],"confidence":0.895316,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.519209,"label":"boat"},{"bbox":[0.15,0.7,0.08,0.1],"confidence":0.963318,"label":"buoy"}]
+2026-03-06 16:34:41.357 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.34,0.36,0.3,0.44],"confidence":0.812078,"label":"person"},{"bbox":[0.35,0.37,0.28,0.13],"confidence":0.740345,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.422,"label":"boat"}]
+2026-03-06 16:34:44.360 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.4,0.36,0.3,0.44],"confidence":0.424554,"label":"person"},{"bbox":[0.41,0.37,0.28,0.13],"confidence":0.766941,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.959524,"label":"boat"},{"bbox":[0.18,0.7,0.08,0.1],"confidence":0.601269,"label":"buoy"}]
+2026-03-06 16:34:47.361 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.3,0.36,0.3,0.44],"confidence":0.782644,"label":"person"},{"bbox":[0.31,0.37,0.28,0.13],"confidence":0.475909,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.803352,"label":"boat"}]
+2026-03-06 16:34:50.363 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.36,0.36,0.3,0.44],"confidence":0.416327,"label":"person"},{"bbox":[0.37,0.37,0.28,0.13],"confidence":0.664165,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.945011,"label":"boat"},{"bbox":[0.21,0.7,0.08,0.1],"confidence":0.914841,"label":"buoy"}]
+2026-03-06 16:34:53.364 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.42,0.36,0.3,0.44],"confidence":0.534303,"label":"person"},{"bbox":[0.43,0.37,0.28,0.13],"confidence":0.908409,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.793137,"label":"boat"}]
+2026-03-06 16:34:56.365 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.32,0.36,0.3,0.44],"confidence":0.605519,"label":"person"},{"bbox":[0.33,0.37,0.28,0.13],"confidence":0.661273,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.795502,"label":"boat"},{"bbox":[0.24,0.7,0.08,0.1],"confidence":0.83327,"label":"buoy"}]
+2026-03-06 16:34:59.366 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.38,0.36,0.3,0.44],"confidence":0.885719,"label":"person"},{"bbox":[0.39,0.37,0.28,0.13],"confidence":0.581362,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.90549,"label":"boat"}]
+2026-03-06 16:35:02.364 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.28,0.36,0.3,0.44],"confidence":0.968096,"label":"person"},{"bbox":[0.29,0.37,0.28,0.13],"confidence":0.766029,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.379757,"label":"boat"},{"bbox":[0.12,0.7,0.08,0.1],"confidence":0.746635,"label":"buoy"}]
+2026-03-06 16:35:05.367 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.34,0.36,0.3,0.44],"confidence":0.642463,"label":"person"},{"bbox":[0.35,0.37,0.28,0.13],"confidence":0.752049,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.660707,"label":"boat"}]
+2026-03-06 16:35:08.367 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.4,0.36,0.3,0.44],"confidence":0.620948,"label":"person"},{"bbox":[0.41,0.37,0.28,0.13],"confidence":0.961448,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.973968,"label":"boat"},{"bbox":[0.15,0.7,0.08,0.1],"confidence":0.960677,"label":"buoy"}]
+2026-03-06 16:35:11.368 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.3,0.36,0.3,0.44],"confidence":0.64007,"label":"person"},{"bbox":[0.31,0.37,0.28,0.13],"confidence":0.524245,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.484634,"label":"boat"}]
+2026-03-06 16:35:14.367 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.36,0.36,0.3,0.44],"confidence":0.438635,"label":"person"},{"bbox":[0.37,0.37,0.28,0.13],"confidence":0.819875,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.952284,"label":"boat"},{"bbox":[0.18,0.7,0.08,0.1],"confidence":0.443611,"label":"buoy"}]
+2026-03-06 16:35:17.372 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.42,0.36,0.3,0.44],"confidence":0.924208,"label":"person"},{"bbox":[0.43,0.37,0.28,0.13],"confidence":0.980916,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.464401,"label":"boat"}]
+2026-03-06 16:35:20.373 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.32,0.36,0.3,0.44],"confidence":0.760922,"label":"person"},{"bbox":[0.33,0.37,0.28,0.13],"confidence":0.601838,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.555078,"label":"boat"},{"bbox":[0.21,0.7,0.08,0.1],"confidence":0.659801,"label":"buoy"}]
+2026-03-06 16:35:23.373 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.38,0.36,0.3,0.44],"confidence":0.645742,"label":"person"},{"bbox":[0.39,0.37,0.28,0.13],"confidence":0.589241,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.874606,"label":"boat"}]
+2026-03-06 16:35:26.377 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.28,0.36,0.3,0.44],"confidence":0.855856,"label":"person"},{"bbox":[0.29,0.37,0.28,0.13],"confidence":0.746619,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.799231,"label":"boat"},{"bbox":[0.24,0.7,0.08,0.1],"confidence":0.589432,"label":"buoy"}]
+2026-03-06 16:35:29.382 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.34,0.36,0.3,0.44],"confidence":0.754279,"label":"person"},{"bbox":[0.35,0.37,0.28,0.13],"confidence":0.635342,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.552358,"label":"boat"}]
+2026-03-06 16:35:32.383 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.4,0.36,0.3,0.44],"confidence":0.395343,"label":"person"},{"bbox":[0.41,0.37,0.28,0.13],"confidence":0.757923,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.407141,"label":"boat"},{"bbox":[0.12,0.7,0.08,0.1],"confidence":0.710407,"label":"buoy"}]
+2026-03-06 16:35:35.378 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.3,0.36,0.3,0.44],"confidence":0.653988,"label":"person"},{"bbox":[0.31,0.37,0.28,0.13],"confidence":0.645996,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.780197,"label":"boat"}]
+2026-03-06 16:35:38.379 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.36,0.36,0.3,0.44],"confidence":0.42332,"label":"person"},{"bbox":[0.37,0.37,0.28,0.13],"confidence":0.942136,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.874026,"label":"boat"},{"bbox":[0.15,0.7,0.08,0.1],"confidence":0.73752,"label":"buoy"}]
+2026-03-06 16:35:40.064 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.38,0.36,0.3,0.44],"confidence":0.700715,"label":"person"},{"bbox":[0.39,0.37,0.28,0.13],"confidence":0.550989,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.517433,"label":"boat"}]
+2026-03-06 16:35:42.065 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.42,0.36,0.3,0.44],"confidence":0.882291,"label":"person"},{"bbox":[0.43,0.37,0.28,0.13],"confidence":0.524211,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.555679,"label":"boat"}]
+2026-03-06 16:35:45.066 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.32,0.36,0.3,0.44],"confidence":0.677013,"label":"person"},{"bbox":[0.33,0.37,0.28,0.13],"confidence":0.575664,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.397459,"label":"boat"},{"bbox":[0.18,0.7,0.08,0.1],"confidence":0.576134,"label":"buoy"}]
+2026-03-06 16:35:48.073 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.38,0.36,0.3,0.44],"confidence":0.897008,"label":"person"},{"bbox":[0.39,0.37,0.28,0.13],"confidence":0.699839,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.637023,"label":"boat"}]
+2026-03-06 16:35:49.647 [INFO] [app] Config saved to QSettings + SQLite
+2026-03-06 16:35:51.068 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.28,0.36,0.3,0.44],"confidence":0.795608,"label":"person"},{"bbox":[0.29,0.37,0.28,0.13],"confidence":0.692761,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.455218,"label":"boat"},{"bbox":[0.21,0.7,0.08,0.1],"confidence":0.768472,"label":"buoy"}]
+2026-03-06 16:35:54.073 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.34,0.36,0.3,0.44],"confidence":0.792565,"label":"person"},{"bbox":[0.35,0.37,0.28,0.13],"confidence":0.805726,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.739217,"label":"boat"}]
+2026-03-06 16:35:57.072 [WARN] [event] person+rod告警触发, IoU=0.28, objects=[{"bbox":[0.4,0.36,0.3,0.44],"confidence":0.477237,"label":"person"},{"bbox":[0.41,0.37,0.28,0.13],"confidence":0.960018,"label":"rod"},{"bbox":[0.7,0.42,0.26,0.2],"confidence":0.955331,"label":"boat"},{"bbox":[0.24,0.7,0.08,0.1],"confidence":0.404115,"label":"buoy"}]
+2026-03-06 16:36:34.682 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 16:36:40.125 [INFO] [app] StatusBar => 已停止 | DB: ./config/client_cfg.db
+2026-03-06 16:36:40.125 [INFO] [app] Workers stopped
+2026-03-06 16:36:42.289 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 16:43:34.250 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db

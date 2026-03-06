@@ -25,6 +25,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
+#include <QKeySequence>
 #include <QLineEdit>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -156,7 +157,12 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::setupMenus() {
-  auto* pageMenu = menuBar()->addMenu("页面");
+  auto* fileMenu = menuBar()->addMenu("文件(File)");
+  fileMenu->addAction("保存配置", this, &MainWindow::onSaveConfig, QKeySequence::Save);
+  fileMenu->addSeparator();
+  fileMenu->addAction("退出", this, &QWidget::close, QKeySequence::Quit);
+
+  auto* pageMenu = menuBar()->addMenu("页面(Page)");
   auto* pageGroup = new QActionGroup(this);
   pageGroup->setExclusive(true);
 
@@ -168,20 +174,44 @@ void MainWindow::setupMenus() {
     return action;
   };
 
-  auto* liveAction = addPageAction("实时模式", 0);
-  addPageAction("数据视图", 1);
-  addPageAction("回放模式", 2);
-  addPageAction("日志查看", 3);
-  addPageAction("事件查看", 4);
+  auto* liveAction = addPageAction("实时", 0);
+  addPageAction("回放", 1);
+  addPageAction("日志", 2);
+  addPageAction("事件", 3);
   liveAction->setChecked(true);
 
-  auto* liveMenu = menuBar()->addMenu("实时功能");
-  liveMenu->addAction("截图", this, &MainWindow::onCaptureScreenshot);
+  auto* functionMenu = menuBar()->addMenu("功能(Function)");
+  functionMenu->addAction("截图", this, &MainWindow::onCaptureScreenshot);
+  functionMenu->addAction("刷新事件", this, &MainWindow::onRefreshEvents);
+  functionMenu->addSeparator();
 
-  auto* eventMenu = menuBar()->addMenu("事件功能");
-  eventMenu->addAction("刷新事件", this, &MainWindow::onRefreshEvents);
+  auto* themeMenu = functionMenu->addMenu("主题");
+  auto* themeGroup = new QActionGroup(this);
+  themeGroup->setExclusive(true);
 
-  auto* helpMenu = menuBar()->addMenu("帮助");
+  auto* darkAction = themeMenu->addAction("暗");
+  darkAction->setCheckable(true);
+  auto* lightAction = themeMenu->addAction("明");
+  lightAction->setCheckable(true);
+  themeGroup->addAction(darkAction);
+  themeGroup->addAction(lightAction);
+
+  if (config_.theme == "light") {
+    lightAction->setChecked(true);
+  } else {
+    darkAction->setChecked(true);
+  }
+
+  connect(darkAction, &QAction::triggered, this, [this]() {
+    config_.theme = "dark";
+    applyTheme(config_.theme);
+  });
+  connect(lightAction, &QAction::triggered, this, [this]() {
+    config_.theme = "light";
+    applyTheme(config_.theme);
+  });
+
+  auto* helpMenu = menuBar()->addMenu("帮助(Help)");
   helpMenu->addAction("关于", [this] { QMessageBox::information(this, "关于", "Qt RTSP + TCP Client\nPhase1 可用版本"); });
 }
 
@@ -189,82 +219,41 @@ void MainWindow::setupMenus() {
 void MainWindow::setupUi() {
   setWindowTitle("Qt RTSP + TCP Client Demo");
   setWindowIcon(QIcon(":/icons/app_icon.xpm"));
-  resize(1380, 860);
-  setMinimumSize(960, 600);
+  resize(1460, 880);
+  setMinimumSize(1080, 680);
 
   auto* root = new QWidget(this);
   auto* rootLayout = new QVBoxLayout(root);
 
   pages_ = new QStackedWidget(root);
 
-  // 实时页：视频 + 参数编辑
+  // 实时页：左侧视频+状态，右侧参数与接收/解析数据
   auto* livePage = new QWidget(pages_);
   auto* liveLayout = new QHBoxLayout(livePage);
+  liveLayout->setContentsMargins(8, 8, 8, 8);
+  liveLayout->setSpacing(10);
 
-  auto* videoBox = new QGroupBox("实时视频", livePage);
+  auto* leftCol = new QWidget(livePage);
+  auto* leftLayout = new QVBoxLayout(leftCol);
+  leftLayout->setContentsMargins(0, 0, 0, 0);
+  leftLayout->setSpacing(10);
+
+  auto* videoBox = new QGroupBox("实时视频", leftCol);
   auto* videoLayout = new QVBoxLayout(videoBox);
   videoWidget_ = new QVideoWidget(videoBox);
   videoWidget_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   videoLayout->addWidget(videoWidget_, 1);
-  screenshotBtn_ = new QPushButton("截图", videoBox);
+
+  auto* videoActionRow = new QWidget(videoBox);
+  auto* videoActionLayout = new QHBoxLayout(videoActionRow);
+  videoActionLayout->setContentsMargins(0, 0, 0, 0);
+  screenshotBtn_ = new QPushButton("截图", videoActionRow);
   connect(screenshotBtn_, &QPushButton::clicked, this, &MainWindow::onCaptureScreenshot);
-  videoLayout->addWidget(screenshotBtn_, 0, Qt::AlignRight);
+  videoActionLayout->addStretch();
+  videoActionLayout->addWidget(screenshotBtn_);
+  videoLayout->addWidget(videoActionRow);
 
-  auto* cfgGroup = new QGroupBox("参数编辑区", livePage);
-  auto* form = new QFormLayout(cfgGroup);
-  rtspEdit_ = new QLineEdit(cfgGroup);
-  tcpHostEdit_ = new QLineEdit(cfgGroup);
-  tcpPortSpin_ = new QSpinBox(cfgGroup);
-  tcpPortSpin_->setRange(1, 65535);
-  reconnectSpin_ = new QSpinBox(cfgGroup);
-  reconnectSpin_->setRange(500, 60000);
-  reconnectSpin_->setSingleStep(500);
-  recordDirEdit_ = new QLineEdit(cfgGroup);
-  recordEnabledCheck_ = new QCheckBox("启用录制", cfgGroup);
-  themeCombo_ = new QComboBox(cfgGroup);
-  themeCombo_->addItems({"dark", "light"});
-
-  auto* browseBtn = new QPushButton("浏览", cfgGroup);
-  connect(browseBtn, &QPushButton::clicked, this, [this] {
-    const auto d = QFileDialog::getExistingDirectory(this, "选择录制目录", recordDirEdit_->text());
-    if (!d.isEmpty()) recordDirEdit_->setText(d);
-  });
-  auto* recordRow = new QWidget(cfgGroup);
-  auto* recordLayout = new QHBoxLayout(recordRow);
-  recordLayout->setContentsMargins(0, 0, 0, 0);
-  recordLayout->addWidget(recordDirEdit_);
-  recordLayout->addWidget(browseBtn);
-
-  auto* buttonRow = new QWidget(cfgGroup);
-  auto* buttonLayout = new QHBoxLayout(buttonRow);
-  buttonLayout->setContentsMargins(0, 0, 0, 0);
-  auto* startBtn = new QPushButton("启动", buttonRow);
-  auto* stopBtn = new QPushButton("停止", buttonRow);
-  auto* saveCfgBtn = new QPushButton("保存配置", buttonRow);
-  buttonLayout->addWidget(startBtn);
-  buttonLayout->addWidget(stopBtn);
-  buttonLayout->addWidget(saveCfgBtn);
-  connect(startBtn, &QPushButton::clicked, this, &MainWindow::onStartAll);
-  connect(stopBtn, &QPushButton::clicked, this, &MainWindow::onStopAll);
-  connect(saveCfgBtn, &QPushButton::clicked, this, &MainWindow::onSaveConfig);
-
-  form->addRow("RTSP URL", rtspEdit_);
-  form->addRow("TCP Host", tcpHostEdit_);
-  form->addRow("TCP Port", tcpPortSpin_);
-  form->addRow("重连间隔(ms)", reconnectSpin_);
-  form->addRow("录制路径", recordRow);
-  form->addRow("录制开关", recordEnabledCheck_);
-  form->addRow("主题(保存后生效)", themeCombo_);
-  form->addRow("控制", buttonRow);
-
-  liveLayout->addWidget(videoBox, 4);
-  liveLayout->addWidget(cfgGroup, 2);
-  pages_->addWidget(livePage);
-
-  // 数据视图页（菜单第二项）
-  auto* dataPage = new QWidget(pages_);
-  auto* dataLayout = new QVBoxLayout(dataPage);
-  auto* statusBox = new QGroupBox("状态面板", dataPage);
+  auto* statusBox = new QGroupBox("连接与告警", leftCol);
   auto* statusLayout = new QVBoxLayout(statusBox);
 
   auto* connRow = new QHBoxLayout();
@@ -290,22 +279,76 @@ void MainWindow::setupUi() {
   alertRow->addWidget(alertStateLabel_, 1);
   statusLayout->addLayout(alertRow);
 
-  auto* rawGroup = new QGroupBox("接收数据", statusBox);
+  leftLayout->addWidget(videoBox, 5);
+  leftLayout->addWidget(statusBox, 2);
+
+  auto* rightCol = new QWidget(livePage);
+  auto* rightLayout = new QVBoxLayout(rightCol);
+  rightLayout->setContentsMargins(0, 0, 0, 0);
+  rightLayout->setSpacing(10);
+
+  auto* cfgGroup = new QGroupBox("参数编辑区", rightCol);
+  auto* form = new QFormLayout(cfgGroup);
+  rtspEdit_ = new QLineEdit(cfgGroup);
+  tcpHostEdit_ = new QLineEdit(cfgGroup);
+  tcpPortSpin_ = new QSpinBox(cfgGroup);
+  tcpPortSpin_->setRange(1, 65535);
+  reconnectSpin_ = new QSpinBox(cfgGroup);
+  reconnectSpin_->setRange(500, 60000);
+  reconnectSpin_->setSingleStep(500);
+  recordDirEdit_ = new QLineEdit(cfgGroup);
+  recordEnabledCheck_ = new QCheckBox("启用录制", cfgGroup);
+
+  auto* browseBtn = new QPushButton("浏览", cfgGroup);
+  connect(browseBtn, &QPushButton::clicked, this, [this] {
+    const auto d = QFileDialog::getExistingDirectory(this, "选择录制目录", recordDirEdit_->text());
+    if (!d.isEmpty()) recordDirEdit_->setText(d);
+  });
+  auto* recordRow = new QWidget(cfgGroup);
+  auto* recordLayout = new QHBoxLayout(recordRow);
+  recordLayout->setContentsMargins(0, 0, 0, 0);
+  recordLayout->addWidget(recordDirEdit_);
+  recordLayout->addWidget(browseBtn);
+
+  auto* buttonRow = new QWidget(cfgGroup);
+  auto* buttonLayout = new QHBoxLayout(buttonRow);
+  buttonLayout->setContentsMargins(0, 0, 0, 0);
+  auto* startBtn = new QPushButton("启动", buttonRow);
+  auto* stopBtn = new QPushButton("停止", buttonRow);
+  buttonLayout->addWidget(startBtn);
+  buttonLayout->addWidget(stopBtn);
+  connect(startBtn, &QPushButton::clicked, this, &MainWindow::onStartAll);
+  connect(stopBtn, &QPushButton::clicked, this, &MainWindow::onStopAll);
+
+  form->addRow("RTSP URL", rtspEdit_);
+  form->addRow("TCP Host", tcpHostEdit_);
+  form->addRow("TCP Port", tcpPortSpin_);
+  form->addRow("重连间隔(ms)", reconnectSpin_);
+  form->addRow("录制路径", recordRow);
+  form->addRow("录制开关", recordEnabledCheck_);
+  form->addRow("控制", buttonRow);
+
+  auto* rawGroup = new QGroupBox("接收数据", rightCol);
   auto* rawLayout = new QVBoxLayout(rawGroup);
   recvDataView_ = new QPlainTextEdit(rawGroup);
   recvDataView_->setReadOnly(true);
+  recvDataView_->setMinimumHeight(190);
   rawLayout->addWidget(recvDataView_);
 
-  auto* parsedGroup = new QGroupBox("解析结果", statusBox);
+  auto* parsedGroup = new QGroupBox("解析结果", rightCol);
   auto* parsedLayout = new QVBoxLayout(parsedGroup);
   parsedResultView_ = new QPlainTextEdit(parsedGroup);
   parsedResultView_->setReadOnly(true);
+  parsedResultView_->setMinimumHeight(170);
   parsedLayout->addWidget(parsedResultView_);
 
-  statusLayout->addWidget(rawGroup, 3);
-  statusLayout->addWidget(parsedGroup, 3);
-  dataLayout->addWidget(statusBox, 1);
-  pages_->addWidget(dataPage);
+  rightLayout->addWidget(cfgGroup, 3);
+  rightLayout->addWidget(rawGroup, 4);
+  rightLayout->addWidget(parsedGroup, 3);
+
+  liveLayout->addWidget(leftCol, 3);
+  liveLayout->addWidget(rightCol, 2);
+  pages_->addWidget(livePage);
 
   auto* playbackPage = new QWidget(pages_);
   auto* pbLayout = new QVBoxLayout(playbackPage);
@@ -566,7 +609,7 @@ demo::client::AppConfig MainWindow::collectConfigFromUi() const {
   cfg.reconnectIntervalMs = reconnectSpin_->value();
   cfg.recordDir = toStoredRelativePath(resolvePath(recordDirEdit_->text().trimmed(), "./recordings"));
   cfg.recordEnabled = recordEnabledCheck_->isChecked();
-  cfg.theme = themeCombo_->currentText();
+  if (cfg.theme.isEmpty()) cfg.theme = config_.theme;
   return cfg;
 }
 
@@ -577,7 +620,6 @@ void MainWindow::applyConfigToUi(const demo::client::AppConfig& cfg) {
   reconnectSpin_->setValue(cfg.reconnectIntervalMs);
   recordDirEdit_->setText(toStoredRelativePath(resolvePath(cfg.recordDir, "./recordings")));
   recordEnabledCheck_->setChecked(cfg.recordEnabled);
-  themeCombo_->setCurrentText(cfg.theme);
   applyTheme(cfg.theme);
 }
 
