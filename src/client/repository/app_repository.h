@@ -5,10 +5,6 @@
 
 #include <QObject>
 
-QT_BEGIN_NAMESPACE
-class QSettings;
-QT_END_NAMESPACE
-
 namespace demo::client {
 class SQLiteDatabaseService;
 
@@ -23,7 +19,7 @@ public:
 class AppRepository : public QObject, public IAppRepository {
   Q_OBJECT
 public:
-  AppRepository(SQLiteDatabaseService* db, QSettings* settings, QObject* parent = nullptr);
+  AppRepository(SQLiteDatabaseService* db, QObject* parent = nullptr);
 
   AppConfig loadConfig() override;
   void saveConfig(const AppConfig& cfg) override;
@@ -31,7 +27,6 @@ public:
 
 private:
   SQLiteDatabaseService* db_{nullptr};
-  QSettings* settings_{nullptr};
 };
 
 } // namespace demo::client

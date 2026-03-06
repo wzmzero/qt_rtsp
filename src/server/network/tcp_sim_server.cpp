@@ -35,7 +35,20 @@ std::map<int, std::string> loadClassMap(const std::string& path) {
 
   std::string line;
   while (std::getline(in, line)) {
-    if (line.empty() || line[0] == '#') continue;
+    if (line.empty() || line[0] == '#' || line[0] == ';') continue;
+    if (line.front() == '[') continue; // ini section
+
+    const auto eq = line.find('=');
+    if (eq != std::string::npos) {
+      const auto k = line.substr(0, eq);
+      const auto v = line.substr(eq + 1);
+      try {
+        int id = std::stoi(k);
+        if (!v.empty()) mp[id] = v;
+      } catch (...) {}
+      continue;
+    }
+
     std::replace(line.begin(), line.end(), ':', ' ');
     std::istringstream iss(line);
     int id = -1;

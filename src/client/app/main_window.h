@@ -24,7 +24,6 @@ class QStackedWidget;
 class QTableWidget;
 class QVideoWidget;
 class QSlider;
-class QSettings;
 class QTimer;
 QT_END_NAMESPACE
 
@@ -151,7 +150,6 @@ private:
   demo::client::RecordWorker* recorder_{nullptr};
   demo::client::SQLiteDatabaseService* db_{nullptr};
   demo::client::AppRepository* repo_{nullptr};
-  QSettings* settings_{nullptr};
 
   demo::client::TelemetryPacket lastPkt_{};
   demo::client::AppConfig config_{};

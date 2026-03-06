@@ -38,7 +38,6 @@
 #include <QPlainTextEdit>
 #include <QPixmap>
 #include <QPushButton>
-#include <QSettings>
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QStatusBar>
@@ -80,8 +79,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   projectRootDir_ = QDir::currentPath();
   const QString cfgDir = QDir(projectRootDir_).filePath("./config");
   QDir().mkpath(cfgDir);
-  settings_ = new QSettings(QDir(cfgDir).filePath("client.ini"), QSettings::IniFormat, this);
-  logsDir_ = resolvePath(settings_->value("storage/logs_dir").toString(), "./logs");
+  logsDir_ = resolvePath("./logs", "./logs");
   dbPath_ = QDir(cfgDir).filePath("client_cfg.db");
   dbDisplayPath_ = "./config/client_cfg.db";
 
@@ -99,7 +97,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   ensureRuntimeDirs();
 
   db_ = new demo::client::SQLiteDatabaseService(dbPath_);
-  repo_ = new demo::client::AppRepository(db_, settings_, this);
+  repo_ = new demo::client::AppRepository(db_, this);
 
   setupUi();
   setupMenus();
@@ -132,7 +130,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   bool dbReady = false;
   QMetaObject::invokeMethod(db_, [&dbReady, this]() { dbReady = db_->initialize(); }, Qt::BlockingQueuedConnection);
   if (!dbReady) {
-    appendLog("WARN", "db", "SQLite 初始化失败，将仅使用 QSettings");
+    appendLog("WARN", "db", "SQLite 初始化失败，配置将使用程序默认值");
   }
 
   config_ = repo_->loadConfig();
@@ -493,8 +491,6 @@ void MainWindow::setupUi() {
 
 void MainWindow::onStartAll() {
   config_ = collectConfigFromUi();
-  settings_->setValue("storage/logs_dir", toStoredRelativePath(logsDir_));
-  settings_->sync();
   repo_->saveConfig(config_);
 
   rtspConnected_ = false;
@@ -531,8 +527,6 @@ void MainWindow::onSaveConfig() {
   config_ = collectConfigFromUi();
   config_.windowGeometry = saveGeometry();
   config_.windowState = saveState();
-  settings_->setValue("storage/logs_dir", toStoredRelativePath(logsDir_));
-  settings_->sync();
   repo_->saveConfig(config_);
   applyTheme(config_.theme);
   appendLog("INFO", "app", QString("Config saved, theme=%1").arg(config_.theme));
