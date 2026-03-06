@@ -2,10 +2,12 @@
 
 #include <QObject>
 #include <QVideoFrame>
+#include <QUrl>
 
 QT_BEGIN_NAMESPACE
 class QMediaPlayer;
 class QVideoSink;
+class QTimer;
 QT_END_NAMESPACE
 
 namespace demo::client {
@@ -25,10 +27,16 @@ signals:
 
 private slots:
   void onFrameChanged(const QVideoFrame& frame);
+  void onPlayerError();
+  void checkStreamAlive();
 
 private:
   QMediaPlayer* player_{nullptr};
   QVideoSink* sink_{nullptr};
+  QTimer* watchdog_{nullptr};
+  QUrl baseUrl_;
+  qint64 lastFrameTsMs_{0};
+  bool triedTcpParam_{false};
 };
 
 } // namespace demo::client
