@@ -77,3 +77,9 @@ cmake --build build -j4
   - `git config user.email "subagent@local"`
 - 重新提交成功。
 
+
+## 验证补充（2026-03-06 11:37 GMT+8）
+- 重新执行 `cmake -S . -B build`
+- 重新执行 `cmake --build build -j4`
+- 结果：`sim_server` 与 `qt_client` 构建成功
+- 备注：收到 CMake dev warning（top-level 对非 Qt target 开启 AUTOGEN），不影响构建与运行
