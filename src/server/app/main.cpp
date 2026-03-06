@@ -238,7 +238,7 @@ void run_tcp_loop(ServerOptions opts) {
 }
 
 void run_rtsp_loop(ServerOptions opts) {
-  demo::server::RtspLauncher launcher(opts.ffmpeg_path, opts.video_path, opts.rtsp_url, opts.require_rtsp);
+  demo::server::RtspLauncher launcher(opts.ffmpeg_path, opts.video_path, opts.rtsp_url, opts.require_rtsp, 1200);
   g_rtsp = &launcher;
 
   int backoff_ms = opts.rtsp_retry_min_ms;
