@@ -1,7 +1,7 @@
 #include "network/tcp_client_worker.h"
 
 #include <QDateTime>
-#include "telemetry.pb.h"
+#include "message.pb.h"
 
 namespace demo::client {
 

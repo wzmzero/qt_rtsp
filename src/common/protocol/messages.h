@@ -1,6 +1,6 @@
 #pragma once
 
-#include "telemetry.pb.h"
+#include "message.pb.h"
 
 #include <cstdint>
 #include <string>
