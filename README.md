@@ -1,43 +1,20 @@
 # qt_rtsp_tcp_project
 
-Qt6 客户端 + C++ 模拟服务端示例，支持 RTSP 视频与 TCP 遥测融合展示。
-本次补齐了 **SQLite3（QtSql）数据访问层 + Repository 抽象 + 主窗口接入**。
+Qt6 客户端 + C++ 模拟服务端示例，支持 RTSP 视频与 TCP 遥测融合展示。  
+当前服务端已支持“一体化启动”：`sim_server` 启动时自动拉起 ffmpeg 推流进程，并在退出时联动停止。
 
-## 主要能力
+## 本次实现（服务端一体化 + 客户端配置）
 
-- 多线程解耦：TCP / RTSP / Record / DB
-- 配置可编辑并持久化（QSettings + SQLite）
-- 遥测（检测结果 + GPS）持续入库
-- UI 不直接写 SQL，统一走 Repository
-- 数据库写入通过 `QueuedConnection` 异步投递，避免阻塞 UI
-
-## 架构分层
-
-```text
-src/client/
-  app/                  # MainWindow(UI编排)
-  core/                 # DTO + AppConfig
-  network/              # TcpClientWorker (含重连)
-  media/                # StreamWorker / RecordWorker
-  database/             # IDatabaseService + SQLiteDatabaseService
-  repository/           # IAppRepository + AppRepository
-```
-
-## SQLite Schema（v1）
-
-- `schema_version(version)`
-- `app_config`
-  - `id=1`
-  - `rtsp_url, tcp_host, tcp_port, reconnect_ms`
-  - `record_dir, record_enabled, theme`
-  - `window_geometry, window_state, updated_at_ms`
-- `telemetry_results`
-  - `id, label, confidence, source_ts_ms, sent_ts_ms, recv_ts_ms`
-  - `gps_time_usec, gps_lat_e7, gps_lon_e7, gps_alt_mm`
-  - `gps_vel_cms, gps_cog_cdeg, gps_fix_type, gps_satellites_visible`
-
-数据库默认位置：
-- Linux: `~/.local/share/qt_client/client_data.sqlite`
+- 客户端 UI 重构 + `QSettings` 参数持久化（原有）
+- 服务端 `sim_server` 自动启动 RTSP 推流（不再需要手动终端 C）
+- 服务端推流参数可配置：
+  - 视频路径（`--video`）
+  - RTSP URL（`--rtsp-url`）
+  - ffmpeg 路径（`--ffmpeg`）
+- 推流失败健壮策略：
+  - 默认：推流失败仅告警，TCP 模拟服务继续运行
+  - 可选：`--require-rtsp`，推流失败即退出
+- 服务端仅使用标准库 + 系统调用（`fork/execvp/kill/waitpid`），不依赖 Qt
 
 ## 构建
 
@@ -46,25 +23,62 @@ cmake -S . -B build
 cmake --build build -j4
 ```
 
-## 运行
+## 运行（新的 A+B+D）
 
-### 1) 启动模拟服务端
+### A) 启动 RTSP 服务端（例如 mediamtx）
 
 ```bash
-./build/src/server/sim_server 9000 sample.mp4
+mediamtx
 ```
 
-### 2) 启动客户端
+### B) 启动 sim_server（自动推流 + TCP 模拟）
+
+```bash
+./build/src/server/sim_server
+```
+
+默认等价于：
+
+```bash
+./build/src/server/sim_server \
+  --tcp-port 9000 \
+  --video media/test.mp4 \
+  --rtsp-url rtsp://127.0.0.1:8554/live \
+  --ffmpeg ffmpeg
+```
+
+常用参数：
+
+```bash
+./build/src/server/sim_server \
+  --tcp-port 9100 \
+  --video /path/to/demo.mp4 \
+  --rtsp-url rtsp://127.0.0.1:8554/live \
+  --ffmpeg /usr/bin/ffmpeg
+```
+
+如果希望“推流必须成功”，加：
+
+```bash
+./build/src/server/sim_server --require-rtsp
+```
+
+### D) 启动客户端
 
 ```bash
 ./build/src/client/qt_client
 ```
 
-## 使用说明（数据库相关）
+## 配置持久化说明（客户端）
 
-1. 首次启动客户端会自动初始化 DB，并创建 `schema_version/app_config/telemetry_results`。
-2. 点击“保存配置”或“启动全部”会触发 `repo_->saveConfig()`：
-   - 立即写 QSettings（前台）
-   - 异步写 SQLite（DB 线程）
-3. TCP 收到遥测后，UI 更新展示，并异步调用 `repo_->appendTelemetry(pkt)` 入库。
-4. 启动时配置读取顺序：先读 SQLite，再由 QSettings 覆盖（兼容历史设置）。
+客户端使用 `QSettings` 保存参数（组织名 `qt_rtsp_tcp_project`，应用名 `qt_client`）。  
+包含连接参数、录制参数、主题与窗口布局（geometry/state）。
+
+常见 Linux 存储位置通常位于：
+- `~/.config/qt_rtsp_tcp_project/qt_client.conf`（取决于 Qt 平台后端）
+
+## 兼容性说明
+
+- `sim_server` 仍兼容旧位置参数写法：
+  - `./build/src/server/sim_server [tcp_port] [video_path]`
+- 当前进程管理实现基于 POSIX（Linux/macOS 风格系统调用）。
