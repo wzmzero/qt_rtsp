@@ -4,13 +4,14 @@
 #include "database/database_service.h"
 
 #include <QObject>
-#include <QVideoFrame>
+#include <QImage>
 
 namespace demo::client {
 
 struct RecordItem {
   qint64 frameTsMs{0};
-  QVideoFrame frame;
+  QImage frameImage;
+  bool frameValid{false};
   TelemetryPacket telemetry;
 };
 

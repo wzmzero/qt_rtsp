@@ -8,7 +8,6 @@
 #include <QJsonObject>
 #include <QTextStream>
 #include <QImage>
-#include <QVideoFrame>
 
 namespace demo::client {
 
@@ -36,7 +35,7 @@ void RecordWorker::enqueue(const RecordItem& item) {
   QJsonObject root;
   root["wall_ts_ms"] = QDateTime::currentMSecsSinceEpoch();
   root["frame_ts_ms"] = item.frameTsMs;
-  root["frame_valid"] = item.frame.isValid();
+  root["frame_valid"] = item.frameValid;
   root["latency_ms"] = item.telemetry.sentTsMs > 0 ? item.frameTsMs - item.telemetry.sentTsMs : 0;
 
   QJsonObject det;
@@ -76,13 +75,8 @@ void RecordWorker::enqueue(const RecordItem& item) {
   const qint64 frameTs = item.frameTsMs > 0 ? item.frameTsMs : QDateTime::currentMSecsSinceEpoch();
   const QString imageAbs = outDir_ + QString("/frame_%1.jpg").arg(frameTs);
   bool imageSaved = false;
-  QVideoFrame frame(item.frame);
-  if (frame.isValid()) {
-    if (frame.map(QVideoFrame::ReadOnly)) {
-      const QImage img = frame.toImage();
-      if (!img.isNull()) imageSaved = img.save(imageAbs, "JPG", 90);
-      frame.unmap();
-    }
+  if (!item.frameImage.isNull()) {
+    imageSaved = item.frameImage.save(imageAbs, "JPG", 90);
   }
 
   demo::client::PlaybackIndexRecord rec;

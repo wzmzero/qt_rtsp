@@ -573,8 +573,13 @@ void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
   if (!config_.recordEnabled) return;
   demo::client::RecordItem item;
   item.frameTsMs = tsMs;
-  item.frame = frame;
   item.telemetry = lastPkt_;
+  QVideoFrame copyFrame(frame);
+  item.frameValid = copyFrame.isValid();
+  if (copyFrame.isValid() && copyFrame.map(QVideoFrame::ReadOnly)) {
+    item.frameImage = copyFrame.toImage().copy();
+    copyFrame.unmap();
+  }
   QMetaObject::invokeMethod(recorder_, [this, item]() { recorder_->enqueue(item); }, Qt::QueuedConnection);
 }
 

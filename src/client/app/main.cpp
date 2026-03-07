@@ -14,8 +14,10 @@ int main(int argc, char* argv[]) {
   // 强制使用 FFmpeg 后端并放开 RTSP 协议白名单（解决部分环境下 RTSP 拉流失败）
   qputenv("QT_MEDIA_BACKEND", QByteArray("ffmpeg"));
   qputenv("QT_FFMPEG_PROTOCOL_WHITELIST", QByteArray("file,udp,rtp,tcp,rtsp"));
-  // 禁用硬件解码探测，避免 VAAPI/CUDA 环境导致拉流失败
-  qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", QByteArray(""));
+  // 强制软解码，避免 VAAPI/CUDA -> 纹理导入失败（failed to get textures for frame）
+  qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", QByteArray("none"));
+  // 禁用硬件帧纹理转换路径，规避驱动/上下文不兼容
+  qputenv("QT_DISABLE_HW_TEXTURES_CONVERSION", QByteArray("1"));
 
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
