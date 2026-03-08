@@ -302,7 +302,7 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
                 "IFNULL(CAST(gm.lat_e7 AS REAL)/10000000.0,0), IFNULL(CAST(gm.lon_e7 AS REAL)/10000000.0,0) "
                 "FROM snapshot_events se "
                 "LEFT JOIN gps gm ON gm.telemetry_id = se.telemetry_id "
-                "WHERE se.is_target_event = 1 AND se.event_ts_ms BETWEEN ? AND ?";
+                "WHERE se.event_ts_ms BETWEEN ? AND ?";
   if (!label.trimmed().isEmpty()) {
     sql += " AND se.reason_tag = ?";
   }
