@@ -14,6 +14,7 @@ class QAction;
 class QCheckBox;
 class QComboBox;
 class QDateTimeEdit;
+class QCalendarWidget;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -27,6 +28,7 @@ class QDoubleSpinBox;
 class QStackedWidget;
 class QTableWidget;
 class QSlider;
+class QTimeEdit;
 class QTimer;
 QT_END_NAMESPACE
 
@@ -58,6 +60,12 @@ private slots:
   void onLogFilterChanged();
   void onRefreshPlayback();
   void onPlaybackRowChanged();
+  void onPlaybackQueryChanged();
+  void onPlaybackSeek(int value);
+  void onPlaybackDurationChanged(qint64 durationMs);
+  void onPlaybackPositionChanged(qint64 positionMs);
+  void onPlaybackPlayPause();
+  void onPlaybackSpeedChanged(const QString& text);
   void blinkConnectionIndicator();
 
 private:
@@ -123,11 +131,20 @@ private:
   QTableWidget* eventTable_{nullptr};
 
   QListWidget* playbackList_{nullptr};
+  QCalendarWidget* playbackCalendar_{nullptr};
+  QTimeEdit* playbackFromTime_{nullptr};
+  QTimeEdit* playbackToTime_{nullptr};
+  QSlider* playbackSlider_{nullptr};
+  QPushButton* playbackPlayPauseBtn_{nullptr};
+  QComboBox* playbackSpeedCombo_{nullptr};
+  QLabel* playbackTimeLabel_{nullptr};
   QLabel* playbackPreviewLabel_{nullptr};
   QLabel* playbackInfoLabel_{nullptr};
   QMediaPlayer* playbackPlayer_{nullptr};
   QAudioOutput* playbackAudio_{nullptr};
   QVideoSink* playbackSink_{nullptr};
+  qint64 playbackDurationMs_{0};
+  bool playbackSeeking_{false};
 
   QLabel* videoLabel_{nullptr};
   QPushButton* screenshotBtn_{nullptr};
