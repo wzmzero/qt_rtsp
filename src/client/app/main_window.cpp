@@ -155,9 +155,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     QTimer::singleShot(1500, this, &MainWindow::onSaveConfig);
     QTimer::singleShot(2600, this, &MainWindow::onStopAll);
     QTimer::singleShot(3400, qApp, &QCoreApplication::quit);
-  } else if (!qEnvironmentVariableIsSet("QT_CLIENT_NO_AUTOSTART")) {
-    appendLog("INFO", "app", "Auto-start enabled: starting RTSP/TCP workers");
-    QTimer::singleShot(300, this, &MainWindow::onStartAll);
   }
 }
 
