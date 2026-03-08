@@ -13,24 +13,53 @@ namespace demo::client {
 
 RecordWorker::RecordWorker(QObject* parent) : QObject(parent) {}
 
-void RecordWorker::start(const QString& outDir) {
+void RecordWorker::start(const QString& outDir, const QString& rtspUrl) {
   running_ = true;
   outDir_ = outDir;
+  rtspUrl_ = rtspUrl;
   count_ = 0;
+  frameSeq_ = 0;
   QDir().mkpath(outDir_);
-  emit logMessage(QString("Record worker started: %1").arg(outDir_));
+
+  const qint64 ts = QDateTime::currentMSecsSinceEpoch();
+  currentVideoPath_ = QDir(outDir_).filePath(QString("record_%1.mp4").arg(ts));
+  currentFramesDir_ = QDir(outDir_).filePath(QString("frames_%1").arg(ts));
+  QDir().mkpath(currentFramesDir_);
+
+  emit logMessage(QString("Record worker started: %1, file=%2").arg(outDir_, currentVideoPath_));
 }
 
 void RecordWorker::stop() {
   running_ = false;
-  emit logMessage("Record worker stopped");
+
+  if (!currentFramesDir_.isEmpty() && frameSeq_ > 1) {
+    QStringList args;
+    args << "-y"
+         << "-framerate" << "12"
+         << "-i" << QDir(currentFramesDir_).filePath("frame_%06d.jpg")
+         << "-c:v" << "libx264"
+         << "-preset" << "veryfast"
+         << "-pix_fmt" << "yuv420p"
+         << currentVideoPath_;
+    const int code = QProcess::execute("ffmpeg", args);
+    emit logMessage(QString("Record compose video exit=%1 file=%2").arg(code).arg(currentVideoPath_));
+  }
+
+  emit logMessage(QString("Record worker stopped, file=%1").arg(currentVideoPath_));
 }
 
 void RecordWorker::enqueue(const RecordItem& item) {
   if (!running_) return;
 
   ++count_;
-  if (count_ % 15 != 0) return; // 降低磁盘压力，抽样写入
+
+  if (!item.frameImage.isNull() && (count_ % 2 == 0)) { // 约 12fps
+    ++frameSeq_;
+    const QString imgPath = QDir(currentFramesDir_).filePath(QString("frame_%1.jpg").arg(frameSeq_, 6, 10, QChar('0')));
+    item.frameImage.save(imgPath, "JPG", 88);
+  }
+
+  if (count_ % 15 != 0) return; // 元数据抽样写入
 
   QJsonObject root;
   root["wall_ts_ms"] = QDateTime::currentMSecsSinceEpoch();
@@ -71,26 +100,6 @@ void RecordWorker::enqueue(const RecordItem& item) {
   }
   QTextStream ts(&f);
   ts << QJsonDocument(root).toJson(QJsonDocument::Compact) << '\n';
-
-  const qint64 frameTs = item.frameTsMs > 0 ? item.frameTsMs : QDateTime::currentMSecsSinceEpoch();
-  const QString imageAbs = outDir_ + QString("/frame_%1.jpg").arg(frameTs);
-  bool imageSaved = false;
-  if (!item.frameImage.isNull()) {
-    imageSaved = item.frameImage.save(imageAbs, "JPG", 90);
-  }
-
-  demo::client::PlaybackIndexRecord rec;
-  rec.frameTsMs = frameTs;
-  rec.wallTsMs = root["wall_ts_ms"].toInteger();
-  const QString p = imageSaved ? imageAbs : (outDir_ + "/record_meta.jsonl");
-  const QString rel = QDir::current().relativeFilePath(p);
-  rec.metaPath = rel.startsWith("..") ? p : QString("./%1").arg(rel);
-  rec.latencyMs = root["latency_ms"].toInteger();
-  rec.label = item.telemetry.detection.label;
-  rec.confidence = item.telemetry.detection.confidence;
-  rec.latDeg = static_cast<double>(item.telemetry.gps.latE7) / 10000000.0;
-  rec.lonDeg = static_cast<double>(item.telemetry.gps.lonE7) / 10000000.0;
-  emit playbackIndexed(rec);
 }
 
 

@@ -34,6 +34,8 @@
 #include <QLineEdit>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QMediaPlayer>
+#include <QAudioOutput>
 #include <QMetaObject>
 #include <QPlainTextEdit>
 #include <QPixmap>
@@ -45,6 +47,7 @@
 #include <QStringList>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QListWidget>
 #include <QTextStream>
 #include <QTimer>
 #include <QToolButton>
@@ -200,7 +203,6 @@ void MainWindow::setupMenus() {
   liveAction->setChecked(true);
 
   auto* functionMenu = menuBar()->addMenu("功能(Function)");
-  functionMenu->addAction("截图", this, &MainWindow::onCaptureScreenshot);
   functionMenu->addAction("刷新事件", this, &MainWindow::onRefreshEvents);
   functionMenu->addSeparator();
 
@@ -255,7 +257,10 @@ void MainWindow::setupUi() {
   auto* videoActionLayout = new QHBoxLayout(videoActionRow);
   videoActionLayout->setContentsMargins(0, 0, 0, 0);
   screenshotBtn_ = new QPushButton("截图", videoActionRow);
-  connect(screenshotBtn_, &QPushButton::clicked, this, &MainWindow::onCaptureScreenshot);
+  connect(screenshotBtn_, &QPushButton::clicked, this, [this]() {
+    appendLog("INFO", "event", "手动截图按钮触发");
+    onCaptureScreenshot();
+  });
   videoActionLayout->addStretch();
   videoActionLayout->addWidget(screenshotBtn_);
   videoLayout->addWidget(videoActionRow);
@@ -406,20 +411,15 @@ void MainWindow::setupUi() {
 
   auto* playbackPage = new QWidget(pages_);
   auto* pbLayout = new QHBoxLayout(playbackPage);
-  playbackTable_ = new QTableWidget(playbackPage);
-  playbackTable_->setColumnCount(6);
-  playbackTable_->setHorizontalHeaderLabels({"检测时间", "标签", "置信度", "GPS", "延时(ms)", "图片"});
-  playbackTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-  playbackTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
-  playbackTable_->setSelectionMode(QAbstractItemView::SingleSelection);
-  connect(playbackTable_, &QTableWidget::itemSelectionChanged, this, &MainWindow::onPlaybackRowChanged);
+  playbackList_ = new QListWidget(playbackPage);
+  connect(playbackList_, &QListWidget::itemSelectionChanged, this, &MainWindow::onPlaybackRowChanged);
 
   auto* previewPanel = new QWidget(playbackPage);
   auto* previewLayout = new QVBoxLayout(previewPanel);
-  playbackPreviewLabel_ = new QLabel("暂无回放图片", previewPanel);
+  playbackPreviewLabel_ = new QLabel("暂无回放视频", previewPanel);
   playbackPreviewLabel_->setMinimumSize(520, 320);
   playbackPreviewLabel_->setAlignment(Qt::AlignCenter);
-  playbackPreviewLabel_->setStyleSheet("border:1px solid #64748b;");
+  playbackPreviewLabel_->setStyleSheet("background:#000;border:1px solid #64748b;");
   playbackInfoLabel_ = new QLabel("", previewPanel);
   playbackInfoLabel_->setWordWrap(true);
   auto* refreshPbBtn = new QPushButton("刷新回放", previewPanel);
@@ -428,7 +428,25 @@ void MainWindow::setupUi() {
   previewLayout->addWidget(playbackInfoLabel_);
   previewLayout->addWidget(refreshPbBtn, 0, Qt::AlignRight);
 
-  pbLayout->addWidget(playbackTable_, 3);
+  playbackAudio_ = new QAudioOutput(this);
+  playbackPlayer_ = new QMediaPlayer(this);
+  playbackSink_ = new QVideoSink(this);
+  playbackPlayer_->setAudioOutput(playbackAudio_);
+  playbackPlayer_->setVideoSink(playbackSink_);
+  connect(playbackSink_, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame& frame) {
+    QVideoFrame f(frame);
+    if (!f.isValid() || !playbackPreviewLabel_) return;
+    if (f.map(QVideoFrame::ReadOnly)) {
+      const QImage img = f.toImage();
+      f.unmap();
+      if (!img.isNull()) {
+        playbackPreviewLabel_->setPixmap(QPixmap::fromImage(img).scaled(
+            playbackPreviewLabel_->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+      }
+    }
+  });
+
+  pbLayout->addWidget(playbackList_, 3);
   pbLayout->addWidget(previewPanel, 4);
   pages_->addWidget(playbackPage);
 
@@ -505,7 +523,10 @@ void MainWindow::onStartAll() {
   QMetaObject::invokeMethod(tcp_, "start", Qt::QueuedConnection, Q_ARG(QString, config_.tcpHost),
                             Q_ARG(quint16, config_.tcpPort), Q_ARG(int, config_.reconnectIntervalMs));
   stream_->start(QUrl(config_.rtspUrl));
-  if (config_.recordEnabled) QMetaObject::invokeMethod(recorder_, "start", Qt::QueuedConnection, Q_ARG(QString, runtimeRecordDir));
+  if (config_.recordEnabled) {
+    QMetaObject::invokeMethod(recorder_, "start", Qt::QueuedConnection, Q_ARG(QString, runtimeRecordDir),
+                              Q_ARG(QString, config_.rtspUrl));
+  }
 
   statusBar()->showMessage(QString("运行中 | DB: %1").arg(dbDisplayPath_));
   appendLog("INFO", "app", "Workers started");
@@ -757,49 +778,33 @@ void MainWindow::onRefreshEvents() {
 
 
 void MainWindow::onRefreshPlayback() {
-  QList<demo::client::PlaybackIndexRecord> rows;
-  QMetaObject::invokeMethod(db_, [this, &rows]() { rows = db_->queryPlaybackIndex(300); }, Qt::BlockingQueuedConnection);
+  if (!playbackList_) return;
+  playbackList_->clear();
 
-  if (!playbackTable_) return;
-  playbackTable_->setRowCount(rows.size());
-  for (int i = 0; i < rows.size(); ++i) {
-    const auto& r = rows[i];
-    playbackTable_->setItem(i, 0, new QTableWidgetItem(QDateTime::fromMSecsSinceEpoch(r.frameTsMs).toString("yyyy-MM-dd HH:mm:ss.zzz")));
-    playbackTable_->setItem(i, 1, new QTableWidgetItem(r.label));
-    playbackTable_->setItem(i, 2, new QTableWidgetItem(QString::number(r.confidence, 'f', 2)));
-    playbackTable_->setItem(i, 3, new QTableWidgetItem(QString("%1, %2").arg(r.latDeg, 0, 'f', 7).arg(r.lonDeg, 0, 'f', 7)));
-    playbackTable_->setItem(i, 4, new QTableWidgetItem(QString::number(r.latencyMs)));
-    playbackTable_->setItem(i, 5, new QTableWidgetItem(r.metaPath));
-  }
-  if (playbackTable_->rowCount() > 0) {
-    playbackTable_->selectRow(0);
+  const QString runtimeRecordDir = resolvePath(config_.recordDir, "./media/record");
+  QDir dir(runtimeRecordDir);
+  const auto files = dir.entryList({"record_*.mp4", "*.mp4"}, QDir::Files, QDir::Time);
+  for (const auto& f : files) playbackList_->addItem(f);
+
+  if (playbackList_->count() > 0) {
+    playbackList_->setCurrentRow(0);
     onPlaybackRowChanged();
+  } else if (playbackInfoLabel_) {
+    playbackInfoLabel_->setText("暂无可回放视频");
   }
 }
 
 void MainWindow::onPlaybackRowChanged() {
-  if (!playbackTable_ || !playbackPreviewLabel_) return;
-  const int row = playbackTable_->currentRow();
-  if (row < 0) return;
-  const auto* pathItem = playbackTable_->item(row, 5);
-  if (!pathItem) return;
+  if (!playbackList_ || !playbackPlayer_ || !playbackInfoLabel_) return;
+  auto* item = playbackList_->currentItem();
+  if (!item) return;
 
-  const QString p = resolvePath(pathItem->text(), pathItem->text());
-  QPixmap pix(p);
-  if (!pix.isNull()) {
-    playbackPreviewLabel_->setPixmap(pix.scaled(playbackPreviewLabel_->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-  } else {
-    playbackPreviewLabel_->setText(QString("图片不可用: %1").arg(pathItem->text()));
-    playbackPreviewLabel_->setPixmap(QPixmap());
-  }
+  const QString runtimeRecordDir = resolvePath(config_.recordDir, "./media/record");
+  const QString filePath = QDir(runtimeRecordDir).filePath(item->text());
+  playbackPlayer_->setSource(QUrl::fromLocalFile(filePath));
+  playbackPlayer_->play();
 
-  if (playbackInfoLabel_) {
-    playbackInfoLabel_->setText(QString("时间: %1\n标签: %2  置信度: %3\nGPS: %4")
-                                    .arg(playbackTable_->item(row, 0) ? playbackTable_->item(row, 0)->text() : "--")
-                                    .arg(playbackTable_->item(row, 1) ? playbackTable_->item(row, 1)->text() : "--")
-                                    .arg(playbackTable_->item(row, 2) ? playbackTable_->item(row, 2)->text() : "--")
-                                    .arg(playbackTable_->item(row, 3) ? playbackTable_->item(row, 3)->text() : "--"));
-  }
+  playbackInfoLabel_->setText(QString("播放文件: %1").arg(filePath));
 }
 
 QString MainWindow::formatBboxSummary(const QString& detectionObjectsJson) const {

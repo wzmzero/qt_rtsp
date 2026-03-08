@@ -5,6 +5,7 @@
 
 #include <QObject>
 #include <QImage>
+#include <QProcess>
 
 namespace demo::client {
 
@@ -21,7 +22,7 @@ public:
   explicit RecordWorker(QObject* parent = nullptr);
 
 public slots:
-  void start(const QString& outDir);
+  void start(const QString& outDir, const QString& rtspUrl);
   void stop();
   void enqueue(const RecordItem& item);
 
@@ -32,7 +33,11 @@ signals:
 private:
   bool running_{false};
   QString outDir_;
+  QString rtspUrl_;
   int count_{0};
+  int frameSeq_{0};
+  QString currentVideoPath_;
+  QString currentFramesDir_;
 };
 
 } // namespace demo::client

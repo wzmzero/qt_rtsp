@@ -17,6 +17,9 @@ class QDateTimeEdit;
 class QLabel;
 class QLineEdit;
 class QListWidget;
+class QMediaPlayer;
+class QAudioOutput;
+class QVideoSink;
 class QPlainTextEdit;
 class QPushButton;
 class QSpinBox;
@@ -119,9 +122,12 @@ private:
   QDateTimeEdit* eventTo_{nullptr};
   QTableWidget* eventTable_{nullptr};
 
-  QTableWidget* playbackTable_{nullptr};
+  QListWidget* playbackList_{nullptr};
   QLabel* playbackPreviewLabel_{nullptr};
   QLabel* playbackInfoLabel_{nullptr};
+  QMediaPlayer* playbackPlayer_{nullptr};
+  QAudioOutput* playbackAudio_{nullptr};
+  QVideoSink* playbackSink_{nullptr};
 
   QLabel* videoLabel_{nullptr};
   QPushButton* screenshotBtn_{nullptr};
