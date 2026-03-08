@@ -39,6 +39,7 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QScrollBar>
 #include <QStackedWidget>
 #include <QStatusBar>
 #include <QStringList>
@@ -222,7 +223,7 @@ void MainWindow::setupMenus() {
 }
 
 void MainWindow::setupUi() {
-  setWindowTitle("Qt RTSP + TCP Client Demo");
+  setWindowTitle("无人机巡检钓鱼人检测客户端");
   setWindowIcon(QIcon(":/icons/app_icon.xpm"));
   resize(1460, 880);
   setMinimumSize(1080, 680);
@@ -545,10 +546,13 @@ void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
 
   QString rawLine = pkt.rawJsonLine;
   if (rawLine.size() > 220) rawLine = rawLine.left(220) + " ...";
-  rawHistory_.prepend(QString("[%1] %2")
-                          .arg(QDateTime::fromMSecsSinceEpoch(lastTelemetryTsMs_).toString("HH:mm:ss"), rawLine));
-  while (rawHistory_.size() > 200) rawHistory_.removeLast();
-  recvDataView_->setPlainText(rawHistory_.mid(0, 20).join("\n"));
+  rawHistory_.append(QString("[%1] %2")
+                         .arg(QDateTime::fromMSecsSinceEpoch(lastTelemetryTsMs_).toString("HH:mm:ss"), rawLine));
+  while (rawHistory_.size() > 200) rawHistory_.removeFirst();
+  recvDataView_->setPlainText(rawHistory_.join("\n"));
+  if (recvDataView_ && recvDataView_->verticalScrollBar()) {
+    recvDataView_->verticalScrollBar()->setValue(recvDataView_->verticalScrollBar()->maximum());
+  }
 
   evaluatePersonRodAlert(pkt);
   if (alertActive_ && !lastFrameImage_.isNull()) {
@@ -680,7 +684,9 @@ void MainWindow::refreshParsedUi(const demo::client::TelemetryPacket& pkt) {
     if (lb == "rod") rodConf = qMax(rodConf, o.confidence);
   }
 
-  const bool hit = personConf >= alertThreshold_ && rodConf >= alertThreshold_;
+  const double threshold = alertThresholdSpin_ ? alertThresholdSpin_->value() : alertThreshold_;
+  alertThreshold_ = threshold;
+  const bool hit = personConf >= threshold && rodConf >= threshold;
 
   if (parsedAlertLevelLabel_) parsedAlertLevelLabel_->setText(QString("告警级别: %1").arg(hit ? "触发" : "未触发"));
   if (parsedTriggerLabel_) {
@@ -688,7 +694,7 @@ void MainWindow::refreshParsedUi(const demo::client::TelemetryPacket& pkt) {
                                      .arg(personConf, 0, 'f', 2)
                                      .arg(rodConf, 0, 'f', 2));
   }
-  if (parsedThresholdLabel_) parsedThresholdLabel_->setText(QString("阈值: %1").arg(alertThreshold_, 0, 'f', 2));
+  if (parsedThresholdLabel_) parsedThresholdLabel_->setText(QString("阈值: %1").arg(threshold, 0, 'f', 2));
   const auto t = QDateTime::fromMSecsSinceEpoch(pkt.recvTsMs).toString("HH:mm:ss");
   if (parsedTimeLabel_) parsedTimeLabel_->setText(QString("解析时间: %1").arg(t));
   if (parsedObjectsLabel_) parsedObjectsLabel_->setText(QString("目标数量: %1").arg(pkt.detection.objects.size()));
@@ -920,7 +926,9 @@ void MainWindow::evaluatePersonRodAlert(const demo::client::TelemetryPacket& pkt
     if (lb == "rod") rodConf = qMax(rodConf, obj.confidence);
   }
 
-  const bool hit = personConf >= alertThreshold_ && rodConf >= alertThreshold_;
+  const double threshold = alertThresholdSpin_ ? alertThresholdSpin_->value() : alertThreshold_;
+  alertThreshold_ = threshold;
+  const bool hit = personConf >= threshold && rodConf >= threshold;
 
   alertActive_ = hit;
   QString levelText = "idle";
