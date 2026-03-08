@@ -50,7 +50,6 @@
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QVideoSink>
-#include <QVideoWidget>
 
 namespace {
 double e7ToDegree(int e7) { return static_cast<double>(e7) / 10000000.0; }
@@ -156,6 +155,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     QTimer::singleShot(1500, this, &MainWindow::onSaveConfig);
     QTimer::singleShot(2600, this, &MainWindow::onStopAll);
     QTimer::singleShot(3400, qApp, &QCoreApplication::quit);
+  } else if (!qEnvironmentVariableIsSet("QT_CLIENT_NO_AUTOSTART")) {
+    appendLog("INFO", "app", "Auto-start enabled: starting RTSP/TCP workers");
+    QTimer::singleShot(300, this, &MainWindow::onStartAll);
   }
 }
 
@@ -244,9 +246,12 @@ void MainWindow::setupUi() {
 
   auto* videoBox = new QGroupBox("实时视频", leftCol);
   auto* videoLayout = new QVBoxLayout(videoBox);
-  videoWidget_ = new QVideoWidget(videoBox);
-  videoWidget_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-  videoLayout->addWidget(videoWidget_, 1);
+  videoLabel_ = new QLabel("等待视频帧...", videoBox);
+  videoLabel_->setAlignment(Qt::AlignCenter);
+  videoLabel_->setMinimumSize(640, 360);
+  videoLabel_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  videoLabel_->setStyleSheet("background:#000;border:1px solid #334155;");
+  videoLayout->addWidget(videoLabel_, 1);
 
   auto* videoActionRow = new QWidget(videoBox);
   auto* videoActionLayout = new QHBoxLayout(videoActionRow);
@@ -549,7 +554,7 @@ void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
   recvDataView_->setPlainText(rawHistory_.mid(0, 20).join("\n"));
 
   evaluatePersonRodAlert(pkt);
-  if (alertActive_) {
+  if (alertActive_ && !lastFrameImage_.isNull()) {
     const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
     if (nowMs - lastAutoCaptureMs_ >= 2000) {
       const auto path = saveScreenshotWithMetadata("auto_event");
@@ -562,8 +567,14 @@ void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
 }
 
 void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
-  if (videoWidget_ && videoWidget_->videoSink()) {
-    videoWidget_->videoSink()->setVideoFrame(frame);
+  QVideoFrame copyFrame(frame);
+  if (copyFrame.isValid() && copyFrame.map(QVideoFrame::ReadOnly)) {
+    lastFrameImage_ = copyFrame.toImage().copy();
+    copyFrame.unmap();
+  }
+  if (!lastFrameImage_.isNull() && videoLabel_) {
+    const QPixmap pix = QPixmap::fromImage(lastFrameImage_);
+    videoLabel_->setPixmap(pix.scaled(videoLabel_->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
   }
   rtspConnected_ = true;
   lastFrameTsMs_ = tsMs > 0 ? tsMs : QDateTime::currentMSecsSinceEpoch();
@@ -574,11 +585,11 @@ void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
   demo::client::RecordItem item;
   item.frameTsMs = tsMs;
   item.telemetry = lastPkt_;
-  QVideoFrame copyFrame(frame);
-  item.frameValid = copyFrame.isValid();
-  if (copyFrame.isValid() && copyFrame.map(QVideoFrame::ReadOnly)) {
-    item.frameImage = copyFrame.toImage().copy();
-    copyFrame.unmap();
+  QVideoFrame recordFrame(frame);
+  item.frameValid = recordFrame.isValid();
+  if (recordFrame.isValid() && recordFrame.map(QVideoFrame::ReadOnly)) {
+    item.frameImage = recordFrame.toImage().copy();
+    recordFrame.unmap();
   }
   QMetaObject::invokeMethod(recorder_, [this, item]() { recorder_->enqueue(item); }, Qt::QueuedConnection);
 }
@@ -689,11 +700,12 @@ void MainWindow::refreshParsedUi(const demo::client::TelemetryPacket& pkt) {
 
 QString MainWindow::saveScreenshotWithMetadata(const QString& reasonTag) {
   const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-  const auto pix = videoWidget_->grab();
-  if (pix.isNull()) {
-    appendLog("ERROR", "event", "截图失败");
+  if (lastFrameImage_.isNull()) {
+    appendLog("ERROR", "event", "截图失败：尚未收到视频帧");
     return {};
   }
+
+  const auto pix = QPixmap::fromImage(lastFrameImage_);
 
   QByteArray jpg;
   QBuffer buffer(&jpg);

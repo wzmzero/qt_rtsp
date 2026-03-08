@@ -3,6 +3,7 @@
 #include "core/app_config.h"
 #include "core/types.h"
 
+#include <QImage>
 #include <QMainWindow>
 #include <QRectF>
 #include <QThread>
@@ -22,7 +23,6 @@ class QSpinBox;
 class QDoubleSpinBox;
 class QStackedWidget;
 class QTableWidget;
-class QVideoWidget;
 class QSlider;
 class QTimer;
 QT_END_NAMESPACE
@@ -123,7 +123,7 @@ private:
   QLabel* playbackPreviewLabel_{nullptr};
   QLabel* playbackInfoLabel_{nullptr};
 
-  QVideoWidget* videoWidget_{nullptr};
+  QLabel* videoLabel_{nullptr};
   QPushButton* screenshotBtn_{nullptr};
   QPushButton* rawDetailBtn_{nullptr};
   QTimer* connBlinkTimer_{nullptr};
@@ -134,6 +134,7 @@ private:
   bool responseBound_{false};
   qint64 lastFrameTsMs_{0};
   qint64 lastTelemetryTsMs_{0};
+  QImage lastFrameImage_;
   QStringList rawHistory_;
 
   QAction* darkThemeAction_{nullptr};

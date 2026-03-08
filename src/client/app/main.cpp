@@ -18,6 +18,9 @@ int main(int argc, char* argv[]) {
   qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", QByteArray("none"));
   // 禁用硬件帧纹理转换路径，规避驱动/上下文不兼容
   qputenv("QT_DISABLE_HW_TEXTURES_CONVERSION", QByteArray("1"));
+  // 强制软件 OpenGL，进一步规避 "failed to get textures for frame" 类驱动问题
+  qputenv("QT_OPENGL", QByteArray("software"));
+  qputenv("LIBGL_ALWAYS_SOFTWARE", QByteArray("1"));
 
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
