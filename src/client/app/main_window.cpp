@@ -417,7 +417,9 @@ void MainWindow::setupUi() {
   auto* playbackPage = new QWidget(pages_);
   auto* pbLayout = new QHBoxLayout(playbackPage);
 
-  auto* queryPanel = new QGroupBox("时间查询", playbackPage);
+  auto* leftPanel = new QWidget(playbackPage);
+  auto* leftPanelLayout = new QVBoxLayout(leftPanel);
+  auto* queryPanel = new QGroupBox("时间查询", leftPanel);
   auto* queryLayout = new QVBoxLayout(queryPanel);
   playbackCalendar_ = new QCalendarWidget(queryPanel);
   playbackFromTime_ = new QTimeEdit(QTime(0, 0, 0), queryPanel);
@@ -433,8 +435,14 @@ void MainWindow::setupUi() {
   queryLayout->addWidget(playbackToTime_);
   queryLayout->addWidget(queryBtn);
 
-  playbackList_ = new QListWidget(playbackPage);
+  auto* resultPanel = new QGroupBox("查询结果", leftPanel);
+  auto* resultLayout = new QVBoxLayout(resultPanel);
+  playbackList_ = new QListWidget(resultPanel);
   connect(playbackList_, &QListWidget::itemSelectionChanged, this, &MainWindow::onPlaybackRowChanged);
+  resultLayout->addWidget(playbackList_);
+
+  leftPanelLayout->addWidget(queryPanel, 4);
+  leftPanelLayout->addWidget(resultPanel, 5);
 
   auto* previewPanel = new QWidget(playbackPage);
   auto* previewLayout = new QVBoxLayout(previewPanel);
@@ -446,7 +454,7 @@ void MainWindow::setupUi() {
   auto* ctrlRow = new QWidget(previewPanel);
   auto* ctrlLayout = new QHBoxLayout(ctrlRow);
   ctrlLayout->setContentsMargins(0, 0, 0, 0);
-  playbackPlayPauseBtn_ = new QPushButton("暂停", ctrlRow);
+  playbackPlayPauseBtn_ = new QPushButton("播放", ctrlRow);
   connect(playbackPlayPauseBtn_, &QPushButton::clicked, this, &MainWindow::onPlaybackPlayPause);
   playbackSlider_ = new QSlider(Qt::Horizontal, ctrlRow);
   playbackSlider_->setRange(0, 1000);
@@ -463,13 +471,9 @@ void MainWindow::setupUi() {
 
   playbackInfoLabel_ = new QLabel("", previewPanel);
   playbackInfoLabel_->setWordWrap(true);
-  auto* refreshPbBtn = new QPushButton("刷新回放", previewPanel);
-  connect(refreshPbBtn, &QPushButton::clicked, this, &MainWindow::onRefreshPlayback);
-
   previewLayout->addWidget(playbackPreviewLabel_, 1);
   previewLayout->addWidget(ctrlRow);
   previewLayout->addWidget(playbackInfoLabel_);
-  previewLayout->addWidget(refreshPbBtn, 0, Qt::AlignRight);
 
   playbackAudio_ = new QAudioOutput(this);
   playbackPlayer_ = new QMediaPlayer(this);
@@ -491,9 +495,8 @@ void MainWindow::setupUi() {
     }
   });
 
-  pbLayout->addWidget(queryPanel, 2);
-  pbLayout->addWidget(playbackList_, 3);
-  pbLayout->addWidget(previewPanel, 5);
+  pbLayout->addWidget(leftPanel, 3);
+  pbLayout->addWidget(previewPanel, 7);
   pages_->addWidget(playbackPage);
 
   auto* logsPage = new QWidget(pages_);
@@ -851,6 +854,7 @@ void MainWindow::onPlaybackQueryChanged() {
   if (playbackList_->count() > 0) {
     playbackList_->setCurrentRow(0);
     onPlaybackRowChanged();
+    if (playbackPlayPauseBtn_) playbackPlayPauseBtn_->setText("播放");
   } else if (playbackInfoLabel_) {
     playbackInfoLabel_->setText("当前时间段暂无可回放视频");
   }
@@ -864,10 +868,10 @@ void MainWindow::onPlaybackRowChanged() {
   const QString runtimeRecordDir = resolvePath(config_.recordDir, "./media/record");
   const QString filePath = QDir(runtimeRecordDir).filePath(item->text());
   playbackPlayer_->setSource(QUrl::fromLocalFile(filePath));
-  playbackPlayer_->play();
-  if (playbackPlayPauseBtn_) playbackPlayPauseBtn_->setText("暂停");
+  playbackPlayer_->pause();
+  if (playbackPlayPauseBtn_) playbackPlayPauseBtn_->setText("播放");
 
-  playbackInfoLabel_->setText(QString("播放文件: %1").arg(filePath));
+  playbackInfoLabel_->setText(QString("已加载文件: %1").arg(filePath));
 }
 
 void MainWindow::onPlaybackSeek(int value) {
