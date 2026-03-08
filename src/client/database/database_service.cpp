@@ -298,15 +298,13 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
   QList<EventRecord> items;
   if (!ensureConnection()) return items;
 
-  QString sql = "SELECT se.event_ts_ms, se.screenshot_blob, se.label, se.confidence, se.is_target_event, "
-                "IFNULL(CAST(gm.lat_e7 AS REAL)/10000000.0,0), IFNULL(CAST(gm.lon_e7 AS REAL)/10000000.0,0), "
-                "IFNULL((SELECT GROUP_CONCAT(printf('%s:[%.2f,%.2f,%.2f,%.2f]', do.label, do.cx, do.cy, do.w, do.h), ' | ') "
-                "        FROM detection_object do WHERE do.telemetry_id = se.telemetry_id ORDER BY do.obj_index LIMIT 2), '') "
+  QString sql = "SELECT se.event_ts_ms, se.screenshot_blob, se.reason_tag, se.is_target_event, "
+                "IFNULL(CAST(gm.lat_e7 AS REAL)/10000000.0,0), IFNULL(CAST(gm.lon_e7 AS REAL)/10000000.0,0) "
                 "FROM snapshot_events se "
                 "LEFT JOIN gps gm ON gm.telemetry_id = se.telemetry_id "
                 "WHERE se.is_target_event = 1 AND se.event_ts_ms BETWEEN ? AND ?";
   if (!label.trimmed().isEmpty()) {
-    sql += " AND se.label = ?";
+    sql += " AND se.reason_tag = ?";
   }
   sql += " ORDER BY se.event_ts_ms DESC LIMIT ?";
 
@@ -328,12 +326,10 @@ QList<EventRecord> SQLiteDatabaseService::queryEvents(const QString& label, qint
     r.tsMs = q.value(0).toLongLong();
     r.screenshotPath.clear();
     r.screenshotBlob = q.value(1).toByteArray();
-    r.label = q.value(2).toString();
-    r.confidence = q.value(3).toDouble();
-    r.isTargetEvent = q.value(4).toInt() != 0;
-    r.latDeg = q.value(5).toDouble();
-    r.lonDeg = q.value(6).toDouble();
-    r.bboxSummary = q.value(7).toString();
+    r.reasonTag = q.value(2).toString();
+    r.isTargetEvent = q.value(3).toInt() != 0;
+    r.latDeg = q.value(4).toDouble();
+    r.lonDeg = q.value(5).toDouble();
     items.push_back(r);
   }
   return items;

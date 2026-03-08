@@ -469,7 +469,7 @@ void MainWindow::setupUi() {
   eventTo_->setCalendarPopup(true);
   auto* refreshBtn = new QPushButton("查询", eventPage);
   connect(refreshBtn, &QPushButton::clicked, this, &MainWindow::onRefreshEvents);
-  ef->addWidget(new QLabel("标签", eventPage));
+  ef->addWidget(new QLabel("原因", eventPage));
   ef->addWidget(eventLabelFilter_);
   ef->addWidget(new QLabel("开始", eventPage));
   ef->addWidget(eventFrom_);
@@ -478,8 +478,8 @@ void MainWindow::setupUi() {
   ef->addWidget(refreshBtn);
 
   eventTable_ = new QTableWidget(eventPage);
-  eventTable_->setColumnCount(7);
-  eventTable_->setHorizontalHeaderLabels({"检测时间", "标签", "置信度", "GPS", "目标框", "截图路径", "事件"});
+  eventTable_->setColumnCount(4);
+  eventTable_->setHorizontalHeaderLabels({"事件时间", "GPS", "截图路径", "事件原因"});
   eventTable_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 
   eventLayout->addWidget(eventFilterRow);
@@ -741,13 +741,10 @@ void MainWindow::onRefreshEvents() {
   for (int i = 0; i < result.size(); ++i) {
     const auto& r = result[i];
     eventTable_->setItem(i, 0, new QTableWidgetItem(QDateTime::fromMSecsSinceEpoch(r.tsMs).toString("yyyy-MM-dd HH:mm:ss")));
-    eventTable_->setItem(i, 1, new QTableWidgetItem(r.label));
-    eventTable_->setItem(i, 2, new QTableWidgetItem(QString::number(r.confidence, 'f', 2)));
-    eventTable_->setItem(i, 3, new QTableWidgetItem(QString("%1, %2").arg(r.latDeg, 0, 'f', 7).arg(r.lonDeg, 0, 'f', 7)));
-    eventTable_->setItem(i, 4, new QTableWidgetItem(formatBboxSummary(r.bboxSummary)));
+    eventTable_->setItem(i, 1, new QTableWidgetItem(QString("%1, %2").arg(r.latDeg, 0, 'f', 7).arg(r.lonDeg, 0, 'f', 7)));
     const QString shotRef = r.screenshotPath.isEmpty() ? QString("DB_BLOB(%1 bytes)").arg(r.screenshotBlob.size()) : r.screenshotPath;
-    eventTable_->setItem(i, 5, new QTableWidgetItem(shotRef));
-    eventTable_->setItem(i, 6, new QTableWidgetItem(r.isTargetEvent ? "是" : "否"));
+    eventTable_->setItem(i, 2, new QTableWidgetItem(shotRef));
+    eventTable_->setItem(i, 3, new QTableWidgetItem(r.reasonTag));
   }
   appendLog("INFO", "event", QString("事件查询完成: %1 条").arg(result.size()));
 }

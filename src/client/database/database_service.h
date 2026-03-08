@@ -13,12 +13,10 @@ struct EventRecord {
   qint64 tsMs{0};
   QString screenshotPath;
   QByteArray screenshotBlob;
-  QString label;
-  double confidence{0.0};
+  QString reasonTag;
   bool isTargetEvent{false};
   double latDeg{0.0};
   double lonDeg{0.0};
-  QString bboxSummary;
 };
 
 class IDatabaseService {
