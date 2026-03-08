@@ -6,9 +6,37 @@
 
 #include <QApplication>
 #include <QByteArray>
+#include <QDir>
 
+#include <dlfcn.h>
+
+#include <cstdio>
 #include <iostream>
 #include <string>
+
+namespace {
+void redirectStderrToLogFile() {
+  const QString logsDir = QDir::current().filePath("./logs");
+  QDir().mkpath(logsDir);
+  const QString stderrLog = QDir(logsDir).filePath("qt_ffmpeg_stderr.log");
+  (void)freopen(stderrLog.toLocal8Bit().constData(), "a", stderr);
+}
+
+void silenceFfmpegAvLog() {
+  using AvLogSetLevelFn = void (*)(int);
+  constexpr int AV_LOG_QUIET = -8;
+  const char* libs[] = {"libavutil.so", "libavutil.so.58", "libavutil.so.57"};
+  for (const char* lib : libs) {
+    void* h = dlopen(lib, RTLD_NOW | RTLD_GLOBAL);
+    if (!h) continue;
+    auto fn = reinterpret_cast<AvLogSetLevelFn>(dlsym(h, "av_log_set_level"));
+    if (fn) {
+      fn(AV_LOG_QUIET);
+      return;
+    }
+  }
+}
+} // namespace
 
 int main(int argc, char* argv[]) {
   // 强制使用 FFmpeg 后端并放开 RTSP 协议白名单（解决部分环境下 RTSP 拉流失败）
@@ -21,6 +49,13 @@ int main(int argc, char* argv[]) {
   // 强制软件 OpenGL，进一步规避 "failed to get textures for frame" 类驱动问题
   qputenv("QT_OPENGL", QByteArray("software"));
   qputenv("LIBGL_ALWAYS_SOFTWARE", QByteArray("1"));
+  // 关闭 FFmpeg 探测调试输出，避免终端刷屏（如 Checking HW acceleration...）
+  qputenv("QT_FFMPEG_DEBUG", QByteArray("0"));
+  qputenv("QT_LOGGING_RULES", QByteArray("qt.multimedia.ffmpeg.*=false;qt.multimedia.ffmpeg=false"));
+  if (!qEnvironmentVariableIsSet("QT_CLIENT_STDERR_CONSOLE")) {
+    redirectStderrToLogFile();
+  }
+  silenceFfmpegAvLog();
 
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
