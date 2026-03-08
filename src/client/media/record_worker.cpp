@@ -21,12 +21,36 @@ void RecordWorker::start(const QString& outDir, const QString& rtspUrl) {
   frameSeq_ = 0;
   QDir().mkpath(outDir_);
 
-  const qint64 ts = QDateTime::currentMSecsSinceEpoch();
-  currentVideoPath_ = QDir(outDir_).filePath(QString("record_%1.mp4").arg(ts));
-  currentFramesDir_ = QDir(outDir_).filePath(QString("frames_%1").arg(ts));
+  const QDateTime now = QDateTime::currentDateTime();
+  const QString dayDirName = now.toString("yyyyMMdd");
+  const QString dayDir = QDir(outDir_).filePath(dayDirName);
+  QDir().mkpath(dayDir);
+
+  // 以30分钟为粒度分桶，避免文件粒度过小
+  const int bucketMin = (now.time().minute() / 30) * 30;
+  const QDateTime bucketStart(now.date(), QTime(now.time().hour(), bucketMin, 0));
+  const QString bucketTag = bucketStart.toString("yyyyMMdd_HHmm");
+
+  QString baseName = QString("record_%1").arg(bucketTag);
+  QString videoPath = QDir(dayDir).filePath(baseName + ".mp4");
+  int part = 1;
+  while (QFile::exists(videoPath)) {
+    ++part;
+    videoPath = QDir(dayDir).filePath(QString("%1_part%2.mp4").arg(baseName).arg(part));
+  }
+  currentVideoPath_ = videoPath;
+
+  QString framesName = QString("frames_%1").arg(bucketTag);
+  QString framesDir = QDir(dayDir).filePath(framesName);
+  int fpart = 1;
+  while (QFile::exists(framesDir)) {
+    ++fpart;
+    framesDir = QDir(dayDir).filePath(QString("%1_part%2").arg(framesName).arg(fpart));
+  }
+  currentFramesDir_ = framesDir;
   QDir().mkpath(currentFramesDir_);
 
-  emit logMessage(QString("Record worker started: %1, file=%2").arg(outDir_, currentVideoPath_));
+  emit logMessage(QString("Record worker started: %1, file=%2").arg(dayDir, currentVideoPath_));
 }
 
 void RecordWorker::stop() {

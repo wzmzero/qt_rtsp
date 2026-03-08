@@ -7,6 +7,7 @@
 #include "repository/app_repository.h"
 
 #include <QAction>
+#include <algorithm>
 #include <QActionGroup>
 #include <QApplication>
 #include <QCalendarWidget>
@@ -19,6 +20,7 @@
 #include <QDialogButtonBox>
 #include <QBuffer>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -828,8 +830,10 @@ void MainWindow::onPlaybackQueryChanged() {
   playbackList_->clear();
 
   const QString runtimeRecordDir = resolvePath(config_.recordDir, "./media/record");
-  QDir dir(runtimeRecordDir);
-  const auto files = dir.entryInfoList({"record_*.mp4", "*.mp4"}, QDir::Files, QDir::Time);
+  QList<QFileInfo> files;
+  QDirIterator it(runtimeRecordDir, {"*.mp4"}, QDir::Files, QDirIterator::Subdirectories);
+  while (it.hasNext()) files.push_back(QFileInfo(it.next()));
+  std::sort(files.begin(), files.end(), [](const QFileInfo& a, const QFileInfo& b) { return a.lastModified() > b.lastModified(); });
 
   QDate date = playbackCalendar_ ? playbackCalendar_->selectedDate() : QDate::currentDate();
   QTime fromT = playbackFromTime_ ? playbackFromTime_->time() : QTime(0, 0, 0);
@@ -840,7 +844,8 @@ void MainWindow::onPlaybackQueryChanged() {
   for (const auto& fi : files) {
     const QDateTime c = fi.lastModified();
     if (c < fromDt || c > toDt) continue;
-    playbackList_->addItem(fi.fileName());
+    const QString rel = QDir(runtimeRecordDir).relativeFilePath(fi.filePath());
+    playbackList_->addItem(rel);
   }
 
   if (playbackList_->count() > 0) {
