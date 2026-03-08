@@ -744,7 +744,10 @@ void MainWindow::onRefreshEvents() {
     eventTable_->setItem(i, 1, new QTableWidgetItem(QString("%1, %2").arg(r.latDeg, 0, 'f', 7).arg(r.lonDeg, 0, 'f', 7)));
     const QString shotRef = r.screenshotPath.isEmpty() ? QString("DB_BLOB(%1 bytes)").arg(r.screenshotBlob.size()) : r.screenshotPath;
     eventTable_->setItem(i, 2, new QTableWidgetItem(shotRef));
-    eventTable_->setItem(i, 3, new QTableWidgetItem(r.reasonTag));
+    QString reasonText = r.reasonTag;
+    if (reasonText == "manual") reasonText = "手动截图";
+    else if (reasonText == "auto_event") reasonText = "阈值触发截图";
+    eventTable_->setItem(i, 3, new QTableWidgetItem(reasonText));
   }
   appendLog("INFO", "event", QString("事件查询完成: %1 条").arg(result.size()));
 }
