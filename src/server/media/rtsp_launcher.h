@@ -7,7 +7,7 @@ namespace demo::server {
 
 class RtspLauncher {
 public:
-  RtspLauncher(std::string ffmpeg_path, std::string input_path, std::string rtsp_url, bool required);
+  RtspLauncher(std::string ffmpeg_path, std::string input_path, std::string rtsp_url, bool required, int pkt_size);
 
   bool start();
   void stop();
@@ -21,6 +21,7 @@ private:
   std::string input_path_;
   std::string rtsp_url_;
   bool required_{false};
+  int pkt_size_{1200};
 
   mutable std::mutex mu_;
   int child_pid_{-1};
