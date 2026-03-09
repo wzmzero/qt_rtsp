@@ -11,6 +11,9 @@
 #include <dlfcn.h>
 
 #include <cstdio>
+#include <csignal>
+#include <execinfo.h>
+#include <unistd.h>
 #include <iostream>
 #include <string>
 
@@ -20,6 +23,28 @@ void redirectStderrToLogFile() {
   QDir().mkpath(logsDir);
   const QString stderrLog = QDir(logsDir).filePath("qt_ffmpeg_stderr.log");
   (void)freopen(stderrLog.toLocal8Bit().constData(), "a", stderr);
+}
+
+
+void installCrashHandlers() {
+  auto handler = +[](int sig) {
+    const char* name = (sig == SIGFPE) ? "SIGFPE" : (sig == SIGSEGV) ? "SIGSEGV" : (sig == SIGABRT) ? "SIGABRT" : "SIGNAL";
+    const QString logsDir = QDir::current().filePath("./logs");
+    QDir().mkpath(logsDir);
+    const QString crashLog = QDir(logsDir).filePath("qt_client_crash.log");
+    FILE* f = fopen(crashLog.toLocal8Bit().constData(), "a");
+    if (f) {
+      fprintf(f, "\n=== crash caught: %s (%d) ===\n", name, sig);
+      void* bt[64];
+      int n = backtrace(bt, 64);
+      backtrace_symbols_fd(bt, n, fileno(f));
+      fclose(f);
+    }
+    _exit(128 + sig);
+  };
+  std::signal(SIGFPE, handler);
+  std::signal(SIGSEGV, handler);
+  std::signal(SIGABRT, handler);
 }
 
 void silenceFfmpegAvLog() {
@@ -39,8 +64,14 @@ void silenceFfmpegAvLog() {
 } // namespace
 
 int main(int argc, char* argv[]) {
-  // 强制使用 FFmpeg 后端并放开 RTSP 协议白名单（解决部分环境下 RTSP 拉流失败）
-  qputenv("QT_MEDIA_BACKEND", QByteArray("ffmpeg"));
+  // Linux 下优先 gstreamer（更稳），未安装时可手动 QT_MEDIA_BACKEND=ffmpeg 覆盖
+  if (!qEnvironmentVariableIsSet("QT_MEDIA_BACKEND")) {
+#ifdef __linux__
+    qputenv("QT_MEDIA_BACKEND", QByteArray("gstreamer"));
+#else
+    qputenv("QT_MEDIA_BACKEND", QByteArray("ffmpeg"));
+#endif
+  }
   qputenv("QT_FFMPEG_PROTOCOL_WHITELIST", QByteArray("file,udp,rtp,tcp,rtsp"));
   // 强制软解码，避免 VAAPI/CUDA -> 纹理导入失败（failed to get textures for frame）
   qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", QByteArray("none"));
@@ -52,6 +83,8 @@ int main(int argc, char* argv[]) {
   // 关闭 FFmpeg 探测调试输出，避免终端刷屏（如 Checking HW acceleration...）
   qputenv("QT_FFMPEG_DEBUG", QByteArray("0"));
   qputenv("QT_LOGGING_RULES", QByteArray("qt.multimedia.ffmpeg.*=false;qt.multimedia.ffmpeg=false"));
+  installCrashHandlers();
+
   if (!qEnvironmentVariableIsSet("QT_CLIENT_STDERR_CONSOLE")) {
     redirectStderrToLogFile();
   }
