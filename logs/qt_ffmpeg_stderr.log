@@ -81243,3 +81243,121 @@ Checking HW acceleration for decoder h264
     failed to get textures for frame true
     failed to get textures for frame true
     failed to get textures for frame true
+>>>> listing codecs
+Checking HW acceleration for decoder h264
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+    Checking HW context: cuda
+    Could not create hw context: -1 Operation not permitted
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+Failed to open VDPAU backend libvdpau_nvidia.so: cannot open shared object file: No such file or directory
+    Checking HW context: vdpau
+    Could not create hw context: -1313558101 Unknown error 1313558101
+    Checking HW context: vulkan
+    Using above hw context.
+Checking HW acceleration for decoder h264
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+    Checking HW context: cuda
+    Could not create hw context: -1 Operation not permitted
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+Failed to open VDPAU backend libvdpau_nvidia.so: cannot open shared object file: No such file or directory
+    Checking HW context: vdpau
+    Could not create hw context: -1313558101 Unknown error 1313558101
+init frames context
+failed to init HW frame context -38 "Function not implemented"
+    Checking HW context: vulkan
+    Using above hw context.
+init frames context
+failed to init HW frame context -38 "Function not implemented"
+>>>> listing codecs
+Checking HW acceleration for decoder h264
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+    Checking HW context: cuda
+    Could not create hw context: -1 Operation not permitted
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+Failed to open VDPAU backend libvdpau_nvidia.so: cannot open shared object file: No such file or directory
+    Checking HW context: vdpau
+    Could not create hw context: -1313558101 Unknown error 1313558101
+    Checking HW context: vulkan
+    Using above hw context.
+Checking HW acceleration for decoder h264
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+    Checking HW context: cuda
+    Could not create hw context: -1 Operation not permitted
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+Failed to open VDPAU backend libvdpau_nvidia.so: cannot open shared object file: No such file or directory
+    Checking HW context: vdpau
+    Could not create hw context: -1313558101 Unknown error 1313558101
+    Checking HW context: vulkan
+    Using above hw context.
+init frames context
+failed to init HW frame context -38 "Function not implemented"
+>>>> listing codecs
+Checking HW acceleration for decoder h264
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+    Checking HW context: cuda
+    Could not create hw context: -1 Operation not permitted
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+Failed to open VDPAU backend libvdpau_nvidia.so: cannot open shared object file: No such file or directory
+    Checking HW context: vdpau
+    Could not create hw context: -1313558101 Unknown error 1313558101
+    Checking HW context: vulkan
+    Using above hw context.
+Checking HW acceleration for decoder h264
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+    Checking HW context: cuda
+    Could not create hw context: -1 Operation not permitted
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+Failed to open VDPAU backend libvdpau_nvidia.so: cannot open shared object file: No such file or directory
+    Checking HW context: vdpau
+    Could not create hw context: -1313558101 Unknown error 1313558101
+init frames context
+failed to init HW frame context -38 "Function not implemented"
+    Checking HW context: vulkan
+    Using above hw context.
+qt.qpa.xcb: could not connect to display 
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "" even though it was found.
+This application failed to start because no Qt platform plugin could be initialized. Reinstalling the application may fix this problem.
+
+Available platform plugins are: wayland-egl, offscreen, eglfs, minimalegl, linuxfb, wayland, minimal, vnc, xcb, vkkhrdisplay.
+
+>>>> listing codecs
+>>>> listing codecs
+Checking HW acceleration for decoder h264
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+    Checking HW context: cuda
+    Could not create hw context: -1 Operation not permitted
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+Failed to open VDPAU backend libvdpau_nvidia.so: cannot open shared object file: No such file or directory
+    Checking HW context: vdpau
+    Could not create hw context: -1313558101 Unknown error 1313558101
+    Checking HW context: vulkan
+    Using above hw context.
+Checking HW acceleration for decoder h264
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+    Checking HW context: cuda
+    Could not create hw context: -1 Operation not permitted
+    Checking HW context: vaapi
+    Could not create hw context: -542398533 Unknown error 542398533
+Failed to open VDPAU backend libvdpau_nvidia.so: cannot open shared object file: No such file or directory
+    Checking HW context: vdpau
+    Could not create hw context: -1313558101 Unknown error 1313558101
+init frames context
+failed to init HW frame context -38 "Function not implemented"
+    Checking HW context: vulkan
+    Using above hw context.
+Failed to start video surface due to main thread blocked.

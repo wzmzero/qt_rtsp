@@ -4047,3 +4047,332 @@
 2026-03-09 01:49:31.035 [INFO] [event] 截图入库: db://snapshot/1772992171034
 2026-03-09 01:49:34.035 [INFO] [event] 截图入库: db://snapshot/1772992174033
 2026-03-09 01:50:46.347 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-09 13:38:09.796 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-09 13:38:25.206 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-09 13:38:27.095 [INFO] [app] Workers started
+2026-03-09 13:38:27.153 [INFO] [event] 事件查询完成: 0 条
+2026-03-09 13:38:27.154 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-09 13:38:27.154 [INFO] [tcp] TCP connected
+2026-03-09 13:38:27.155 [INFO] [event] 告警级别切换: hit (person=0.92, rod=0.88)
+2026-03-09 13:38:27.156 [INFO] [record] Record worker started: /home/wzm/qt_rtsp/./media/record/20260309, file=/home/wzm/qt_rtsp/./media/record/20260309/record_20260309_1330.mp4
+2026-03-09 13:38:38.860 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-09 13:38:40.544 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-09 13:38:41.919 [INFO] [app] Workers started
+2026-03-09 13:38:41.971 [INFO] [event] 事件查询完成: 0 条
+2026-03-09 13:38:41.972 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-09 13:38:41.972 [INFO] [tcp] TCP connected
+2026-03-09 13:38:41.973 [INFO] [event] 告警级别切换: hit (person=0.92, rod=0.88)
+2026-03-09 13:38:41.974 [INFO] [record] Record worker started: /home/wzm/qt_rtsp/./media/record/20260309, file=/home/wzm/qt_rtsp/./media/record/20260309/record_20260309_1330.mp4
+2026-03-09 13:38:59.402 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-09 13:39:00.682 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-09 13:39:02.528 [INFO] [app] Workers started
+2026-03-09 13:39:02.564 [INFO] [event] 事件查询完成: 0 条
+2026-03-09 13:39:02.565 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-09 13:39:02.565 [INFO] [tcp] TCP connected
+2026-03-09 13:39:02.566 [INFO] [event] 告警级别切换: hit (person=0.92, rod=0.88)
+2026-03-09 13:39:02.566 [INFO] [record] Record worker started: /home/wzm/qt_rtsp/./media/record/20260309, file=/home/wzm/qt_rtsp/./media/record/20260309/record_20260309_1330.mp4
+2026-03-09 14:26:05.086 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-09 14:29:49.428 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-09 14:29:53.510 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-09 14:29:54.976 [INFO] [app] Workers started
+2026-03-09 14:29:55.032 [INFO] [event] 事件查询完成: 0 条
+2026-03-09 14:29:55.032 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-09 14:29:55.033 [INFO] [tcp] TCP connected
+2026-03-09 14:29:55.033 [INFO] [event] 告警级别切换: hit (person=0.92, rod=0.88)
+2026-03-09 14:29:55.034 [INFO] [record] Record worker started: /home/wzm/qt_rtsp/./media/record/20260309, file=/home/wzm/qt_rtsp/./media/record/20260309/record_20260309_1400.mp4
+2026-03-09 14:43:13.008 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-09 14:43:20.175 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-09 14:43:20.202 [INFO] [app] Workers started
+2026-03-09 14:43:21.231 [INFO] [event] 事件查询完成: 0 条
+2026-03-09 14:43:21.233 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-09 14:43:21.235 [INFO] [tcp] TCP connected
+2026-03-09 14:43:21.236 [INFO] [event] 告警级别切换: hit (person=0.92, rod=0.88)
+2026-03-09 14:43:21.238 [INFO] [record] Record worker started: /home/wzm/qt_rtsp/./media/record/20260309, file=/home/wzm/qt_rtsp/./media/record/20260309/record_20260309_1430.mp4
+2026-03-09 14:43:22.181 [INFO] [event] 截图入库: db://snapshot/1773038602177
+2026-03-09 14:43:24.183 [INFO] [event] 截图入库: db://snapshot/1773038604179
+2026-03-09 14:43:26.185 [INFO] [event] 截图入库: db://snapshot/1773038606183
+2026-03-09 14:43:28.188 [INFO] [event] 截图入库: db://snapshot/1773038608184
+2026-03-09 14:43:30.191 [INFO] [event] 截图入库: db://snapshot/1773038610186
+2026-03-09 14:43:31.182 [INFO] [event] 告警级别切换: idle (person=0.92, rod=0.88)
+2026-03-09 14:43:33.183 [INFO] [event] 告警级别切换: hit (person=0.92, rod=0.88)
+2026-03-09 14:43:33.185 [INFO] [event] 截图入库: db://snapshot/1773038613183
+2026-03-09 14:43:36.184 [INFO] [event] 截图入库: db://snapshot/1773038616181
+2026-03-09 14:43:38.187 [INFO] [event] 截图入库: db://snapshot/1773038618183
+2026-03-09 14:43:44.673 [INFO] [event] 截图入库: db://snapshot/1773038624663
+2026-03-09 14:43:47.748 [INFO] [event] 截图入库: db://snapshot/1773038627739
+2026-03-09 14:43:50.313 [INFO] [event] 截图入库: db://snapshot/1773038630308
+2026-03-09 14:43:53.309 [INFO] [event] 截图入库: db://snapshot/1773038633306
+2026-03-09 14:43:55.315 [INFO] [event] 截图入库: db://snapshot/1773038635309
+2026-03-09 14:43:58.309 [INFO] [event] 截图入库: db://snapshot/1773038638307
+2026-03-09 14:44:00.309 [INFO] [event] 截图入库: db://snapshot/1773038640307
+2026-03-09 14:44:02.320 [INFO] [event] 截图入库: db://snapshot/1773038642314
+2026-03-09 14:44:05.313 [INFO] [event] 截图入库: db://snapshot/1773038645308
+2026-03-09 14:44:07.312 [INFO] [event] 截图入库: db://snapshot/1773038647309
+2026-03-09 14:44:09.313 [INFO] [event] 截图入库: db://snapshot/1773038649310
+2026-03-09 14:44:11.318 [INFO] [event] 截图入库: db://snapshot/1773038651311
+2026-03-09 14:44:13.316 [INFO] [event] 截图入库: db://snapshot/1773038653311
+2026-03-09 14:44:17.362 [INFO] [event] 截图入库: db://snapshot/1773038657359
+2026-03-09 14:44:19.362 [INFO] [event] 截图入库: db://snapshot/1773038659359
+2026-03-09 14:44:21.364 [INFO] [event] 截图入库: db://snapshot/1773038661361
+2026-03-09 14:44:24.362 [INFO] [event] 截图入库: db://snapshot/1773038664360
+2026-03-09 14:44:26.363 [INFO] [event] 截图入库: db://snapshot/1773038666360
+2026-03-09 14:44:28.383 [INFO] [event] 截图入库: db://snapshot/1773038668376
+2026-03-09 14:44:31.363 [INFO] [event] 截图入库: db://snapshot/1773038671361
+2026-03-09 14:44:33.378 [INFO] [event] 截图入库: db://snapshot/1773038673371
+2026-03-09 14:44:36.370 [INFO] [event] 截图入库: db://snapshot/1773038676363
+2026-03-09 14:44:39.370 [INFO] [event] 截图入库: db://snapshot/1773038679364
+2026-03-09 14:44:41.368 [INFO] [event] 截图入库: db://snapshot/1773038681364
+2026-03-09 14:44:43.370 [INFO] [event] 截图入库: db://snapshot/1773038683364
+2026-03-09 14:44:45.374 [INFO] [event] 截图入库: db://snapshot/1773038685368
+2026-03-09 14:44:47.381 [INFO] [event] 截图入库: db://snapshot/1773038687377
+2026-03-09 14:44:51.494 [INFO] [event] 截图入库: db://snapshot/1773038691490
+2026-03-09 14:44:54.493 [INFO] [event] 截图入库: db://snapshot/1773038694491
+2026-03-09 14:44:56.496 [INFO] [event] 截图入库: db://snapshot/1773038696491
+2026-03-09 14:44:58.495 [INFO] [event] 截图入库: db://snapshot/1773038698491
+2026-03-09 14:45:00.495 [INFO] [event] 截图入库: db://snapshot/1773038700491
+2026-03-09 14:45:02.495 [INFO] [event] 截图入库: db://snapshot/1773038702491
+2026-03-09 14:45:04.496 [INFO] [event] 截图入库: db://snapshot/1773038704492
+2026-03-09 14:45:06.499 [INFO] [event] 截图入库: db://snapshot/1773038706493
+2026-03-09 14:45:09.499 [INFO] [event] 截图入库: db://snapshot/1773038709493
+2026-03-09 14:45:11.496 [INFO] [event] 截图入库: db://snapshot/1773038711493
+2026-03-09 14:45:13.501 [INFO] [event] 截图入库: db://snapshot/1773038713495
+2026-03-09 14:45:15.504 [INFO] [event] 截图入库: db://snapshot/1773038715496
+2026-03-09 14:45:18.497 [INFO] [event] 截图入库: db://snapshot/1773038718494
+2026-03-09 14:45:20.508 [INFO] [event] 截图入库: db://snapshot/1773038720505
+2026-03-09 14:45:23.504 [INFO] [event] 截图入库: db://snapshot/1773038723496
+2026-03-09 14:45:26.364 [INFO] [event] 截图入库: db://snapshot/1773038726360
+2026-03-09 14:45:28.386 [INFO] [event] 截图入库: db://snapshot/1773038728375
+2026-03-09 14:45:31.370 [INFO] [event] 截图入库: db://snapshot/1773038731363
+2026-03-09 14:45:33.373 [INFO] [event] 截图入库: db://snapshot/1773038733368
+2026-03-09 14:45:36.376 [INFO] [event] 截图入库: db://snapshot/1773038736367
+2026-03-09 14:45:39.383 [INFO] [event] 截图入库: db://snapshot/1773038739375
+2026-03-09 14:45:42.372 [INFO] [event] 截图入库: db://snapshot/1773038742368
+2026-03-09 14:45:44.370 [INFO] [event] 截图入库: db://snapshot/1773038744368
+2026-03-09 14:45:46.370 [INFO] [event] 截图入库: db://snapshot/1773038746368
+2026-03-09 14:45:48.371 [INFO] [event] 截图入库: db://snapshot/1773038748368
+2026-03-09 14:45:50.387 [INFO] [event] 截图入库: db://snapshot/1773038750381
+2026-03-09 14:45:53.373 [INFO] [event] 截图入库: db://snapshot/1773038753369
+2026-03-09 14:45:55.377 [INFO] [event] 截图入库: db://snapshot/1773038755370
+2026-03-09 14:45:57.379 [INFO] [event] 截图入库: db://snapshot/1773038757371
+2026-03-09 14:46:01.256 [INFO] [event] 截图入库: db://snapshot/1773038761253
+2026-03-09 14:46:03.256 [INFO] [event] 截图入库: db://snapshot/1773038763253
+2026-03-09 14:46:05.260 [INFO] [event] 截图入库: db://snapshot/1773038765255
+2026-03-09 14:46:08.264 [INFO] [event] 截图入库: db://snapshot/1773038768255
+2026-03-09 14:46:10.267 [INFO] [event] 截图入库: db://snapshot/1773038770258
+2026-03-09 14:46:13.270 [INFO] [event] 截图入库: db://snapshot/1773038773267
+2026-03-09 14:46:16.258 [INFO] [event] 截图入库: db://snapshot/1773038776255
+2026-03-09 14:46:18.260 [INFO] [event] 截图入库: db://snapshot/1773038778256
+2026-03-09 14:46:20.259 [INFO] [event] 截图入库: db://snapshot/1773038780257
+2026-03-09 14:46:22.264 [INFO] [event] 截图入库: db://snapshot/1773038782261
+2026-03-09 14:46:25.264 [INFO] [event] 截图入库: db://snapshot/1773038785258
+2026-03-09 14:46:28.260 [INFO] [event] 截图入库: db://snapshot/1773038788258
+2026-03-09 14:46:30.264 [INFO] [event] 截图入库: db://snapshot/1773038790259
+2026-03-09 14:46:32.271 [INFO] [event] 截图入库: db://snapshot/1773038792265
+2026-03-09 14:46:35.171 [INFO] [event] 截图入库: db://snapshot/1773038795166
+2026-03-09 14:46:38.165 [INFO] [event] 截图入库: db://snapshot/1773038798159
+2026-03-09 14:46:40.166 [INFO] [event] 截图入库: db://snapshot/1773038800160
+2026-03-09 14:46:43.161 [INFO] [event] 截图入库: db://snapshot/1773038803159
+2026-03-09 14:46:45.169 [INFO] [event] 截图入库: db://snapshot/1773038805163
+2026-03-09 14:46:48.163 [INFO] [event] 截图入库: db://snapshot/1773038808160
+2026-03-09 14:46:50.173 [INFO] [event] 截图入库: db://snapshot/1773038810168
+2026-03-09 14:46:53.173 [INFO] [event] 截图入库: db://snapshot/1773038813168
+2026-03-09 14:46:56.167 [INFO] [event] 截图入库: db://snapshot/1773038816163
+2026-03-09 14:46:58.170 [INFO] [event] 截图入库: db://snapshot/1773038818167
+2026-03-09 14:47:01.166 [INFO] [event] 截图入库: db://snapshot/1773038821163
+2026-03-09 14:47:03.166 [INFO] [event] 截图入库: db://snapshot/1773038823164
+2026-03-09 14:47:05.175 [INFO] [event] 截图入库: db://snapshot/1773038825171
+2026-03-09 14:47:10.064 [INFO] [event] 截图入库: db://snapshot/1773038830062
+2026-03-09 14:47:12.080 [INFO] [event] 截图入库: db://snapshot/1773038832075
+2026-03-09 14:47:15.065 [INFO] [event] 截图入库: db://snapshot/1773038835062
+2026-03-09 14:47:17.068 [INFO] [event] 截图入库: db://snapshot/1773038837064
+2026-03-09 14:47:20.071 [INFO] [event] 截图入库: db://snapshot/1773038840065
+2026-03-09 14:47:22.071 [INFO] [event] 截图入库: db://snapshot/1773038842069
+2026-03-09 14:47:25.072 [INFO] [event] 截图入库: db://snapshot/1773038845067
+2026-03-09 14:47:28.068 [INFO] [event] 截图入库: db://snapshot/1773038848065
+2026-03-09 14:47:30.074 [INFO] [event] 截图入库: db://snapshot/1773038850068
+2026-03-09 14:47:32.074 [INFO] [event] 截图入库: db://snapshot/1773038852070
+2026-03-09 14:47:35.069 [INFO] [event] 截图入库: db://snapshot/1773038855067
+2026-03-09 14:47:37.077 [INFO] [event] 截图入库: db://snapshot/1773038857070
+2026-03-09 14:47:38.228 [INFO] [event] 事件查询完成: 20 条
+2026-03-09 14:47:39.077 [INFO] [event] 截图入库: db://snapshot/1773038859070
+2026-03-09 14:47:42.071 [INFO] [event] 截图入库: db://snapshot/1773038862069
+2026-03-09 14:47:45.299 [INFO] [event] 截图入库: db://snapshot/1773038865294
+2026-03-09 14:47:47.337 [INFO] [event] 手动截图按钮触发
+2026-03-09 14:47:47.346 [INFO] [event] 截图入库: db://snapshot/1773038867344
+2026-03-09 14:47:47.563 [INFO] [event] 手动截图按钮触发
+2026-03-09 14:47:47.570 [INFO] [event] 截图入库: db://snapshot/1773038867567
+2026-03-09 14:47:47.755 [INFO] [event] 手动截图按钮触发
+2026-03-09 14:47:47.762 [INFO] [event] 截图入库: db://snapshot/1773038867760
+2026-03-09 14:47:48.283 [INFO] [event] 截图入库: db://snapshot/1773038868280
+2026-03-09 14:47:50.290 [INFO] [event] 截图入库: db://snapshot/1773038870282
+2026-03-09 14:47:51.341 [INFO] [event] 事件查询完成: 20 条
+2026-03-09 14:47:52.687 [INFO] [event] 事件查询完成: 20 条
+2026-03-09 14:47:53.285 [INFO] [event] 截图入库: db://snapshot/1773038873280
+2026-03-09 14:47:54.559 [INFO] [event] 事件查询完成: 20 条
+2026-03-09 14:47:55.289 [INFO] [event] 截图入库: db://snapshot/1773038875282
+2026-03-09 14:47:56.198 [INFO] [event] 事件查询完成: 20 条
+2026-03-09 14:47:56.380 [INFO] [event] 事件查询完成: 20 条
+2026-03-09 14:47:57.288 [INFO] [event] 截图入库: db://snapshot/1773038877282
+2026-03-09 14:47:59.288 [INFO] [event] 截图入库: db://snapshot/1773038879282
+2026-03-09 14:48:00.443 [INFO] [event] 手动截图按钮触发
+2026-03-09 14:48:00.452 [INFO] [event] 截图入库: db://snapshot/1773038880449
+2026-03-09 14:48:00.839 [INFO] [event] 手动截图按钮触发
+2026-03-09 14:48:00.846 [INFO] [event] 截图入库: db://snapshot/1773038880844
+2026-03-09 14:48:01.046 [INFO] [event] 手动截图按钮触发
+2026-03-09 14:48:01.053 [INFO] [event] 截图入库: db://snapshot/1773038881050
+2026-03-09 14:48:01.220 [INFO] [event] 手动截图按钮触发
+2026-03-09 14:48:01.230 [INFO] [event] 截图入库: db://snapshot/1773038881227
+2026-03-09 14:48:01.287 [INFO] [event] 截图入库: db://snapshot/1773038881283
+2026-03-09 14:48:04.288 [INFO] [event] 截图入库: db://snapshot/1773038884283
+2026-03-09 14:48:04.393 [INFO] [event] 事件查询完成: 20 条
+2026-03-09 14:48:04.632 [INFO] [event] 事件查询完成: 20 条
+2026-03-09 14:48:06.173 [INFO] [event] 事件查询完成: 20 条
+2026-03-09 14:48:06.289 [INFO] [event] 截图入库: db://snapshot/1773038886283
+2026-03-09 14:48:08.285 [INFO] [event] 截图入库: db://snapshot/1773038888283
+2026-03-09 14:48:09.633 [INFO] [event] 事件查询完成: 123 条
+2026-03-09 14:48:10.297 [INFO] [event] 截图入库: db://snapshot/1773038890293
+2026-03-09 14:48:13.286 [INFO] [event] 截图入库: db://snapshot/1773038893284
+2026-03-09 14:48:15.296 [INFO] [event] 截图入库: db://snapshot/1773038895289
+2026-03-09 14:48:19.509 [INFO] [event] 截图入库: db://snapshot/1773038899501
+2026-03-09 14:48:22.510 [INFO] [event] 截图入库: db://snapshot/1773038902502
+2026-03-09 14:48:25.505 [INFO] [event] 截图入库: db://snapshot/1773038905501
+2026-03-09 14:48:27.503 [INFO] [event] 截图入库: db://snapshot/1773038907501
+2026-03-09 14:48:29.504 [INFO] [event] 截图入库: db://snapshot/1773038909501
+2026-03-09 14:48:31.504 [INFO] [event] 截图入库: db://snapshot/1773038911502
+2026-03-09 14:48:33.504 [INFO] [event] 截图入库: db://snapshot/1773038913502
+2026-03-09 14:48:35.508 [INFO] [event] 截图入库: db://snapshot/1773038915503
+2026-03-09 14:48:37.510 [INFO] [event] 截图入库: db://snapshot/1773038917504
+2026-03-09 14:48:39.506 [INFO] [event] 截图入库: db://snapshot/1773038919504
+2026-03-09 14:48:41.507 [INFO] [event] 截图入库: db://snapshot/1773038921504
+2026-03-09 14:48:43.516 [INFO] [event] 截图入库: db://snapshot/1773038923513
+2026-03-09 14:48:45.518 [INFO] [event] 截图入库: db://snapshot/1773038925514
+2026-03-09 14:48:48.510 [INFO] [event] 截图入库: db://snapshot/1773038928508
+2026-03-09 14:48:50.516 [INFO] [event] 截图入库: db://snapshot/1773038930512
+2026-03-09 14:48:54.501 [INFO] [event] 截图入库: db://snapshot/1773038934493
+2026-03-09 14:48:57.488 [INFO] [event] 截图入库: db://snapshot/1773038937486
+2026-03-09 14:49:00.488 [INFO] [event] 截图入库: db://snapshot/1773038940486
+2026-03-09 14:49:02.489 [INFO] [event] 截图入库: db://snapshot/1773038942486
+2026-03-09 14:49:04.489 [INFO] [event] 截图入库: db://snapshot/1773038944486
+2026-03-09 14:49:06.490 [INFO] [event] 截图入库: db://snapshot/1773038946487
+2026-03-09 14:49:08.492 [INFO] [event] 截图入库: db://snapshot/1773038948488
+2026-03-09 14:49:10.498 [INFO] [event] 截图入库: db://snapshot/1773038950491
+2026-03-09 14:49:13.505 [INFO] [event] 截图入库: db://snapshot/1773038953501
+2026-03-09 14:49:16.492 [INFO] [event] 截图入库: db://snapshot/1773038956489
+2026-03-09 14:49:18.499 [INFO] [event] 截图入库: db://snapshot/1773038958497
+2026-03-09 14:49:21.495 [INFO] [event] 截图入库: db://snapshot/1773038961492
+2026-03-09 14:49:24.497 [INFO] [event] 截图入库: db://snapshot/1773038964494
+2026-03-09 14:49:28.514 [INFO] [event] 截图入库: db://snapshot/1773038968512
+2026-03-09 14:49:30.520 [INFO] [event] 截图入库: db://snapshot/1773038970514
+2026-03-09 14:49:33.519 [INFO] [event] 截图入库: db://snapshot/1773038973514
+2026-03-09 14:49:35.530 [INFO] [event] 截图入库: db://snapshot/1773038975525
+2026-03-09 14:49:38.517 [INFO] [event] 截图入库: db://snapshot/1773038978514
+2026-03-09 14:49:40.521 [INFO] [event] 截图入库: db://snapshot/1773038980519
+2026-03-09 14:49:43.519 [INFO] [event] 截图入库: db://snapshot/1773038983516
+2026-03-09 14:49:45.533 [INFO] [event] 截图入库: db://snapshot/1773038985526
+2026-03-09 14:49:48.523 [INFO] [event] 截图入库: db://snapshot/1773038988518
+2026-03-09 14:49:50.526 [INFO] [event] 截图入库: db://snapshot/1773038990519
+2026-03-09 14:49:53.522 [INFO] [event] 截图入库: db://snapshot/1773038993518
+2026-03-09 14:49:55.530 [INFO] [event] 截图入库: db://snapshot/1773038995527
+2026-03-09 14:49:58.526 [INFO] [event] 截图入库: db://snapshot/1773038998520
+2026-03-09 14:50:03.555 [INFO] [event] 截图入库: db://snapshot/1773039003547
+2026-03-09 14:50:06.550 [INFO] [event] 截图入库: db://snapshot/1773039006547
+2026-03-09 14:50:08.549 [INFO] [event] 截图入库: db://snapshot/1773039008547
+2026-03-09 14:50:10.552 [INFO] [event] 截图入库: db://snapshot/1773039010547
+2026-03-09 14:50:12.557 [INFO] [event] 截图入库: db://snapshot/1773039012552
+2026-03-09 14:50:15.550 [INFO] [event] 截图入库: db://snapshot/1773039015547
+2026-03-09 14:50:17.552 [INFO] [event] 截图入库: db://snapshot/1773039017548
+2026-03-09 14:50:19.554 [INFO] [event] 截图入库: db://snapshot/1773039019549
+2026-03-09 14:50:21.558 [INFO] [event] 截图入库: db://snapshot/1773039021553
+2026-03-09 14:50:24.554 [INFO] [event] 截图入库: db://snapshot/1773039024550
+2026-03-09 14:50:26.560 [INFO] [event] 截图入库: db://snapshot/1773039026556
+2026-03-09 14:50:29.553 [INFO] [event] 截图入库: db://snapshot/1773039029550
+2026-03-09 14:50:29.714 [INFO] [event] 事件查询完成: 179 条
+2026-03-09 14:50:31.559 [INFO] [event] 截图入库: db://snapshot/1773039031556
+2026-03-09 14:50:34.554 [INFO] [event] 截图入库: db://snapshot/1773039034551
+2026-03-09 14:50:36.100 [INFO] [app] Config saved, theme=light
+2026-03-09 14:50:36.555 [INFO] [event] 截图入库: db://snapshot/1773039036552
+2026-03-09 14:50:38.562 [INFO] [event] 截图入库: db://snapshot/1773039038553
+2026-03-09 14:50:41.556 [INFO] [event] 截图入库: db://snapshot/1773039041553
+2026-03-09 14:50:43.560 [INFO] [event] 截图入库: db://snapshot/1773039043553
+2026-03-09 14:50:45.558 [INFO] [event] 截图入库: db://snapshot/1773039045553
+2026-03-09 14:50:47.558 [INFO] [event] 截图入库: db://snapshot/1773039047555
+2026-03-09 14:50:53.099 [INFO] [event] 截图入库: db://snapshot/1773039053096
+2026-03-09 14:50:55.099 [INFO] [event] 截图入库: db://snapshot/1773039055096
+2026-03-09 14:50:57.098 [INFO] [event] 截图入库: db://snapshot/1773039057096
+2026-03-09 14:50:59.099 [INFO] [event] 截图入库: db://snapshot/1773039059096
+2026-03-09 14:51:01.099 [INFO] [event] 截图入库: db://snapshot/1773039061096
+2026-03-09 14:51:03.100 [INFO] [event] 截图入库: db://snapshot/1773039063098
+2026-03-09 14:51:06.103 [INFO] [event] 截图入库: db://snapshot/1773039066098
+2026-03-09 14:51:08.105 [INFO] [event] 截图入库: db://snapshot/1773039068099
+2026-03-09 14:51:11.102 [INFO] [event] 截图入库: db://snapshot/1773039071099
+2026-03-09 14:51:13.106 [INFO] [event] 截图入库: db://snapshot/1773039073103
+2026-03-09 14:51:16.105 [INFO] [event] 截图入库: db://snapshot/1773039076102
+2026-03-09 14:51:18.108 [INFO] [event] 截图入库: db://snapshot/1773039078105
+2026-03-09 14:51:21.102 [INFO] [event] 截图入库: db://snapshot/1773039081100
+2026-03-09 14:51:23.108 [INFO] [event] 截图入库: db://snapshot/1773039083106
+2026-03-09 14:51:26.111 [INFO] [event] 截图入库: db://snapshot/1773039086108
+2026-03-09 14:51:29.109 [INFO] [event] 截图入库: db://snapshot/1773039089104
+2026-03-09 14:51:32.108 [INFO] [event] 截图入库: db://snapshot/1773039092106
+2026-03-09 14:51:34.112 [INFO] [event] 截图入库: db://snapshot/1773039094109
+2026-03-09 14:51:37.121 [INFO] [event] 截图入库: db://snapshot/1773039097115
+2026-03-09 14:51:40.108 [INFO] [event] 截图入库: db://snapshot/1773039100106
+2026-03-09 14:51:42.131 [INFO] [event] 截图入库: db://snapshot/1773039102124
+2026-03-09 14:51:45.110 [INFO] [event] 截图入库: db://snapshot/1773039105107
+2026-03-09 14:51:47.110 [INFO] [event] 截图入库: db://snapshot/1773039107108
+2026-03-09 14:51:49.118 [INFO] [event] 截图入库: db://snapshot/1773039109115
+2026-03-09 14:51:52.134 [INFO] [event] 截图入库: db://snapshot/1773039112126
+2026-03-09 14:51:54.134 [INFO] [event] 截图入库: db://snapshot/1773039114130
+2026-03-09 14:51:57.123 [INFO] [event] 截图入库: db://snapshot/1773039117117
+2026-03-09 14:51:59.144 [INFO] [event] 截图入库: db://snapshot/1773039119138
+2026-03-09 14:52:02.138 [INFO] [event] 截图入库: db://snapshot/1773039122131
+2026-03-09 14:52:04.140 [INFO] [event] 截图入库: db://snapshot/1773039124134
+2026-03-09 14:52:07.135 [INFO] [event] 截图入库: db://snapshot/1773039127131
+2026-03-09 14:52:09.149 [INFO] [event] 截图入库: db://snapshot/1773039129145
+2026-03-09 14:52:12.144 [INFO] [event] 截图入库: db://snapshot/1773039132139
+2026-03-09 14:52:15.158 [INFO] [event] 截图入库: db://snapshot/1773039135151
+2026-03-09 14:52:18.138 [INFO] [event] 截图入库: db://snapshot/1773039138135
+2026-03-09 14:52:20.139 [INFO] [event] 截图入库: db://snapshot/1773039140136
+2026-03-09 14:52:22.140 [INFO] [event] 截图入库: db://snapshot/1773039142136
+2026-03-09 14:52:24.138 [INFO] [event] 截图入库: db://snapshot/1773039144136
+2026-03-09 14:52:26.144 [INFO] [event] 截图入库: db://snapshot/1773039146137
+2026-03-09 14:52:28.146 [INFO] [event] 截图入库: db://snapshot/1773039148140
+2026-03-09 14:52:31.148 [INFO] [event] 截图入库: db://snapshot/1773039151145
+2026-03-09 14:52:34.141 [INFO] [event] 截图入库: db://snapshot/1773039154139
+2026-03-09 14:52:36.142 [INFO] [event] 截图入库: db://snapshot/1773039156139
+2026-03-09 14:52:38.165 [INFO] [event] 截图入库: db://snapshot/1773039158156
+2026-03-09 14:52:41.144 [INFO] [event] 截图入库: db://snapshot/1773039161141
+2026-03-09 14:52:43.164 [INFO] [event] 截图入库: db://snapshot/1773039163156
+2026-03-09 14:52:45.538 [INFO] [event] 截图入库: db://snapshot/1773039165530
+2026-03-09 14:52:48.533 [INFO] [event] 截图入库: db://snapshot/1773039168529
+2026-03-09 14:52:50.533 [INFO] [event] 截图入库: db://snapshot/1773039170529
+2026-03-09 14:52:52.537 [INFO] [event] 截图入库: db://snapshot/1773039172530
+2026-03-09 14:52:54.538 [INFO] [event] 截图入库: db://snapshot/1773039174532
+2026-03-09 14:52:56.546 [INFO] [event] 截图入库: db://snapshot/1773039176539
+2026-03-09 14:52:59.535 [INFO] [event] 截图入库: db://snapshot/1773039179533
+2026-03-09 14:53:02.552 [INFO] [event] 截图入库: db://snapshot/1773039182545
+2026-03-09 14:53:04.556 [INFO] [event] 截图入库: db://snapshot/1773039184550
+2026-03-09 14:53:07.539 [INFO] [event] 截图入库: db://snapshot/1773039187534
+2026-03-09 14:53:09.556 [INFO] [event] 截图入库: db://snapshot/1773039189548
+2026-03-09 14:53:12.552 [INFO] [event] 截图入库: db://snapshot/1773039192543
+2026-03-09 14:53:15.559 [INFO] [event] 截图入库: db://snapshot/1773039195552
+2026-03-09 14:53:19.465 [INFO] [event] 截图入库: db://snapshot/1773039199456
+2026-03-09 14:53:22.448 [INFO] [event] 截图入库: db://snapshot/1773039202445
+2026-03-09 14:53:24.448 [INFO] [event] 截图入库: db://snapshot/1773039204445
+2026-03-09 14:53:26.457 [INFO] [event] 截图入库: db://snapshot/1773039206453
+2026-03-09 14:53:29.455 [INFO] [event] 截图入库: db://snapshot/1773039209450
+2026-03-09 14:53:31.459 [INFO] [event] 截图入库: db://snapshot/1773039211450
+2026-03-09 14:53:34.449 [INFO] [event] 截图入库: db://snapshot/1773039214447
+2026-03-09 14:53:36.458 [INFO] [event] 截图入库: db://snapshot/1773039216451
+2026-03-09 14:53:38.462 [INFO] [event] 截图入库: db://snapshot/1773039218455
+2026-03-09 14:53:41.459 [INFO] [event] 截图入库: db://snapshot/1773039221454
+2026-03-09 14:53:44.462 [INFO] [event] 截图入库: db://snapshot/1773039224455
+2026-03-09 14:53:46.471 [INFO] [event] 截图入库: db://snapshot/1773039226465
+2026-03-09 14:53:49.457 [INFO] [event] 截图入库: db://snapshot/1773039229453
+2026-03-09 14:53:53.038 [INFO] [event] 截图入库: db://snapshot/1773039233034
+2026-03-09 14:53:56.025 [INFO] [event] 截图入库: db://snapshot/1773039236022
+2026-03-09 14:53:58.036 [INFO] [event] 截图入库: db://snapshot/1773039238030
+2026-03-09 14:54:01.035 [INFO] [event] 截图入库: db://snapshot/1773039241027
+2026-03-09 14:54:03.033 [INFO] [event] 截图入库: db://snapshot/1773039243031
+2026-03-09 14:54:06.032 [INFO] [event] 截图入库: db://snapshot/1773039246028
+2026-03-09 14:54:09.033 [INFO] [event] 截图入库: db://snapshot/1773039249025
+2026-03-09 14:57:54.943 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
