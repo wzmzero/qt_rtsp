@@ -1,0 +1,34 @@
+2026-03-06 21:40:02.471 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 21:40:02.472 [INFO] [app] AUTOTEST enabled: start->save->stop sequence
+2026-03-06 21:40:02.895 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-06 21:40:02.903 [INFO] [app] Workers started
+2026-03-06 21:40:02.923 [INFO] [event] 事件查询完成: 0 条
+2026-03-06 21:40:02.923 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-06 21:40:02.924 [INFO] [tcp] TCP connected
+2026-03-06 21:40:02.924 [INFO] [event] 告警级别切换: hit (person=0.85, rod=0.93)
+2026-03-06 21:40:02.929 [INFO] [event] 截图入库: db://snapshot/1772804402924
+2026-03-06 21:40:02.929 [INFO] [record] Record worker started: /home/wzm/.openclaw/workspace/./recordings
+2026-03-06 21:40:04.006 [INFO] [app] Config saved, theme=dark
+2026-03-06 21:40:05.073 [INFO] [stream] RTSP stopped
+2026-03-06 21:40:05.073 [INFO] [app] Workers stopped
+2026-03-06 21:40:05.074 [INFO] [tcp] TCP disconnected
+2026-03-06 21:40:05.074 [INFO] [record] Record worker stopped
+2026-03-06 21:40:05.873 [INFO] [stream] RTSP stopped
+2026-03-06 21:40:05.874 [INFO] [app] Workers stopped
+2026-03-06 21:49:58.812 [INFO] [app] MainWindow initialized, DB display path=./config/client_cfg.db
+2026-03-06 21:49:58.813 [INFO] [app] AUTOTEST enabled: start->save->stop sequence
+2026-03-06 21:49:59.238 [INFO] [stream] Start RTSP pull: rtsp://127.0.0.1:8554/live
+2026-03-06 21:49:59.248 [INFO] [app] Workers started
+2026-03-06 21:49:59.265 [INFO] [event] 事件查询完成: 1 条
+2026-03-06 21:49:59.265 [INFO] [tcp] TCP connecting to 127.0.0.1:9000
+2026-03-06 21:49:59.265 [INFO] [tcp] TCP connected
+2026-03-06 21:49:59.266 [INFO] [event] 告警级别切换: hit (person=0.85, rod=0.93)
+2026-03-06 21:49:59.270 [INFO] [event] 截图入库: db://snapshot/1772804999266
+2026-03-06 21:49:59.270 [INFO] [record] Record worker started: /home/wzm/.openclaw/workspace/./recordings
+2026-03-06 21:50:00.345 [INFO] [app] Config saved, theme=dark
+2026-03-06 21:50:01.373 [INFO] [stream] RTSP stopped
+2026-03-06 21:50:01.374 [INFO] [app] Workers stopped
+2026-03-06 21:50:01.374 [INFO] [tcp] TCP disconnected
+2026-03-06 21:50:01.374 [INFO] [record] Record worker stopped
+2026-03-06 21:50:02.172 [INFO] [stream] RTSP stopped
+2026-03-06 21:50:02.173 [INFO] [app] Workers stopped
