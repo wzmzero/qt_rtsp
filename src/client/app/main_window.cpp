@@ -485,6 +485,8 @@ void MainWindow::setupUi() {
   connect(playbackSink_, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame& frame) {
     QVideoFrame f(frame);
     if (!f.isValid() || !playbackPreviewLabel_) return;
+    const QSize sz = f.size();
+    if (!sz.isValid() || sz.width() <= 0 || sz.height() <= 0) return;
     if (f.map(QVideoFrame::ReadOnly)) {
       const QImage img = f.toImage();
       f.unmap();
@@ -639,7 +641,8 @@ void MainWindow::onTelemetry(const demo::client::TelemetryPacket& pkt) {
 
 void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
   QVideoFrame copyFrame(frame);
-  if (copyFrame.isValid() && copyFrame.map(QVideoFrame::ReadOnly)) {
+  const QSize sz = copyFrame.size();
+  if (copyFrame.isValid() && sz.isValid() && sz.width() > 0 && sz.height() > 0 && copyFrame.map(QVideoFrame::ReadOnly)) {
     lastFrameImage_ = copyFrame.toImage().copy();
     copyFrame.unmap();
   }
@@ -657,8 +660,9 @@ void MainWindow::onFrame(const QVideoFrame& frame, qint64 tsMs) {
   item.frameTsMs = tsMs;
   item.telemetry = lastPkt_;
   QVideoFrame recordFrame(frame);
-  item.frameValid = recordFrame.isValid();
-  if (recordFrame.isValid() && recordFrame.map(QVideoFrame::ReadOnly)) {
+  const QSize rsz = recordFrame.size();
+  item.frameValid = recordFrame.isValid() && rsz.isValid() && rsz.width() > 0 && rsz.height() > 0;
+  if (item.frameValid && recordFrame.map(QVideoFrame::ReadOnly)) {
     item.frameImage = recordFrame.toImage().copy();
     recordFrame.unmap();
   }

@@ -37,6 +37,8 @@ void StreamWorker::stop() {
 
 void StreamWorker::onFrameChanged(const QVideoFrame& frame) {
   if (!frame.isValid()) return;
+  const QSize sz = frame.size();
+  if (!sz.isValid() || sz.width() <= 0 || sz.height() <= 0) return;
   lastFrameTsMs_ = QDateTime::currentMSecsSinceEpoch();
   emit frameArrived(frame, lastFrameTsMs_);
 }
